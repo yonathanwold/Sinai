@@ -1,0 +1,158 @@
+{
+  "crops": [
+    {
+      "name": "Radish",
+      "category": ["emergency", "leafy"],
+      "preferred_temperature_bands": ["cool", "warm"],
+      "preferred_light_levels": ["medium", "high"],
+      "preferred_uv_levels": ["low", "medium"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 3,
+      "time_to_harvest_days": 25,
+      "notes": "Very fast harvest crop for visible demo impact and short-term nutrition."
+    },
+    {
+      "name": "Amaranth Greens",
+      "category": ["emergency", "leafy", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["medium", "high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair", "poor"],
+      "resilience_rating": 5,
+      "time_to_harvest_days": 30,
+      "notes": "Heat-tolerant leafy crop useful for quick greens in disrupted areas."
+    },
+    {
+      "name": "Mung Bean",
+      "category": ["emergency", "legume", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["medium", "high"],
+      "preferred_uv_levels": ["low", "medium"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 4,
+      "time_to_harvest_days": 60,
+      "notes": "Can support protein access and soil recovery through nitrogen fixation."
+    },
+    {
+      "name": "Cowpea",
+      "category": ["staple", "legume", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 5,
+      "time_to_harvest_days": 70,
+      "notes": "Drought and heat tolerant, useful for recovery planting in warm regions."
+    },
+    {
+      "name": "Sweet Potato",
+      "category": ["staple", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["medium", "high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 5,
+      "time_to_harvest_days": 100,
+      "notes": "Reliable calorie crop with strong resilience value after supply disruptions."
+    },
+    {
+      "name": "Cassava",
+      "category": ["staple", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair", "poor"],
+      "resilience_rating": 5,
+      "time_to_harvest_days": 240,
+      "notes": "Longer timeline but very resilient for food security planning."
+    },
+    {
+      "name": "Kale",
+      "category": ["leafy", "resilient"],
+      "preferred_temperature_bands": ["cool", "warm"],
+      "preferred_light_levels": ["medium", "high"],
+      "preferred_uv_levels": ["low", "medium"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 4,
+      "time_to_harvest_days": 55,
+      "notes": "Nutritious leafy crop that performs well in cooler recovery sites."
+    },
+    {
+      "name": "Spinach",
+      "category": ["leafy", "emergency"],
+      "preferred_temperature_bands": ["cool"],
+      "preferred_light_levels": ["low", "medium"],
+      "preferred_uv_levels": ["low"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 3,
+      "time_to_harvest_days": 40,
+      "notes": "Useful quick green when conditions are cooler or shaded."
+    },
+    {
+      "name": "Okra",
+      "category": ["fruiting", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 4,
+      "time_to_harvest_days": 60,
+      "notes": "Heat-loving crop with strong performance in humid disruption zones."
+    },
+    {
+      "name": "Pearl Millet",
+      "category": ["staple", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair", "poor"],
+      "resilience_rating": 5,
+      "time_to_harvest_days": 75,
+      "notes": "Resilient grain for dry or hot regions."
+    },
+    {
+      "name": "Sorghum",
+      "category": ["staple", "resilient"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 5,
+      "time_to_harvest_days": 100,
+      "notes": "Drought-tolerant grain suited for resilience planning."
+    },
+    {
+      "name": "Bush Bean",
+      "category": ["legume", "emergency"],
+      "preferred_temperature_bands": ["cool", "warm"],
+      "preferred_light_levels": ["medium", "high"],
+      "preferred_uv_levels": ["low", "medium"],
+      "air_tolerance": ["good", "fair"],
+      "resilience_rating": 3,
+      "time_to_harvest_days": 55,
+      "notes": "Moderately fast protein crop for community garden recovery."
+    },
+    {
+      "name": "Tomato",
+      "category": ["fruiting"],
+      "preferred_temperature_bands": ["warm"],
+      "preferred_light_levels": ["high"],
+      "preferred_uv_levels": ["low", "medium"],
+      "air_tolerance": ["good"],
+      "resilience_rating": 2,
+      "time_to_harvest_days": 80,
+      "notes": "High-value crop but less tolerant of poor air and unstable conditions."
+    },
+    {
+      "name": "Moringa",
+      "category": ["resilient", "leafy"],
+      "preferred_temperature_bands": ["warm", "hot"],
+      "preferred_light_levels": ["high"],
+      "preferred_uv_levels": ["medium", "high"],
+      "air_tolerance": ["good", "fair", "poor"],
+      "resilience_rating": 5,
+      "time_to_harvest_days": 90,
+      "notes": "Highly resilient nutrition tree for longer-term community food support."
+    }
+  ]
+}

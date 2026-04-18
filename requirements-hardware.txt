@@ -1,0 +1,4 @@
+smbus2>=0.4.3
+adafruit-blinka>=8.45.0
+adafruit-circuitpython-veml6070>=1.1.0
+adafruit-circuitpython-ccs811>=1.0.0
