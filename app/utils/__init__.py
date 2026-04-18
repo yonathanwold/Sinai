@@ -1,1 +1,1 @@
-"""Utility helpers for AgriSense AI."""
+"""Utility helpers for Sinai."""

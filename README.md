@@ -1,17 +1,25 @@
-# AgriSense AI
+# Sinai
 
-Disaster-Resilient Food Intelligence Platform for the Sinai hackathon project.
+Sinai is a disaster-resilient, offline-capable food intelligence MVP for NGOs, governments, co-ops, and response agencies.
 
-AgriSense AI is a local-first food intelligence MVP for NGOs, governments, agricultural co-ops, and disaster response organizations. It combines edge environmental sensing with explainable crop recommendations so field teams can make local food decisions when internet access, cloud dashboards, or centralized supply chains fail.
+It combines edge sensors, deterministic crop scoring, and a local AI advisor so field teams can make food-production decisions even when internet and supply chains fail.
 
-## What It Does
+## What Sinai Does
 
-- Reads pressure, temperature, UV, air quality, and light data from a Raspberry Pi plus Arduino sensor stack.
-- Runs in demo/mock mode automatically when hardware is unavailable.
-- Normalizes raw readings into simple labels: cold, cool, warm, hot, low, medium, high, good, fair, poor, rising, stable, and falling.
-- Scores crops using explainable heuristics for climate fit, resilience, and time to harvest.
-- Presents the result as a B2B SaaS dashboard for deployment sites, agencies, and relief operations.
-- Includes a local-model-ready AI recommendation service that can later connect to Ollama.
+- Ingests sensor data from Raspberry Pi I2C sensors plus Arduino serial light readings.
+- Auto-falls back to realistic mock data if live hardware is missing.
+- Classifies environment with explainable labels (temperature, light, UV, air quality, pressure trend).
+- Scores and ranks crops with resilience and harvest-speed priorities.
+- Serves a polished local dashboard that can be opened from nearby phones/laptops.
+- Supports local LLM guidance through Ollama, with deterministic fallback always available.
+
+## Product Framing
+
+Sinai is designed as an edge SaaS deployment model:
+
+- `Edge node`: Raspberry Pi runs sensing, scoring, LLM interface, and web dashboard.
+- `Users`: nearby field operators connect via local network/hotspot on any browser.
+- `Business model`: recurring analytics and recommendation software per deployment site.
 
 ## Folder Structure
 
@@ -28,6 +36,7 @@ Sinai/
     services/
       ai_recommender.py
       crop_engine.py
+      local_ai_advisor.py
       normalization.py
       sensor_ingestion.py
     utils/
@@ -37,6 +46,8 @@ Sinai/
     grove_light_serial.ino
   docs/
     hardware_architecture.md
+    pi_ollama_deployment.md
+    install_ollama_mini_pi.sh
   README.md
   requirements.txt
   requirements-hardware.txt
@@ -45,38 +56,35 @@ Sinai/
 ## Hardware Architecture
 
 ```text
-Arduino reads Grove Light Sensor on A0
-Arduino sends JSON over serial to Raspberry Pi
+Arduino (Grove Light Sensor A0)
+  -> serial JSON -> Raspberry Pi
 
-Raspberry Pi reads:
-- SPA06-003 / SPL06-style pressure and temperature sensor over I2C
-- VEML6070 UV sensor over I2C
-- CCS811 eCO2 and TVOC air quality sensor over I2C
-- Arduino light readings over USB serial
+Raspberry Pi (I2C sensors)
+  - SPA06-003 (pressure/temperature)
+  - VEML6070 (UV)
+  - CCS811 (air quality)
+  - Arduino serial light
 
-Raspberry Pi runs:
-- sensor ingestion
-- classification
-- crop scoring
-- recommendation explanations
-- Streamlit dashboard
+Pi runtime
+  - sensor ingestion + fallback
+  - environment classification
+  - crop scoring and ranking
+  - local AI explanations (optional)
+  - Streamlit web dashboard
 ```
-
-More hardware notes are in `docs/hardware_architecture.md`.
 
 ## Software Architecture
 
-- `app/models`: domain dataclasses for sensor snapshots, classified environments, crops, and crop scores.
-- `app/services/sensor_ingestion.py`: mock sensor generator plus best-effort live hardware readers.
-- `app/services/normalization.py`: explainable environmental classification rules.
-- `app/services/crop_engine.py`: crop scoring and emergency crop selection.
-- `app/services/ai_recommender.py`: local AI abstraction with deterministic fallback explanations.
-- `app/dashboard/streamlit_app.py`: polished operator dashboard and B2B demo framing.
-- `app/data/crops.json`: seed crop database with resilience, harvest time, and environmental preferences.
+- `app/services/sensor_ingestion.py`: live reads + mock fallback merge.
+- `app/services/normalization.py`: explainable threshold classification.
+- `app/services/crop_engine.py`: ranking logic + emergency candidates.
+- `app/services/ai_recommender.py`: narrative recommendation output.
+- `app/services/local_ai_advisor.py`: local LLM Q&A adapter + fallback.
+- `app/dashboard/streamlit_app.py`: B2B-ready UI with `Sinai Dashboard`, `Local LLM Advisor`, and `Edge Deployment` tabs.
 
-## Quick Start
+## Quick Start (Local Demo)
 
-From the project root:
+### Windows PowerShell
 
 ```powershell
 python -m venv .venv
@@ -85,73 +93,95 @@ pip install -r requirements.txt
 streamlit run app/dashboard/streamlit_app.py
 ```
 
-The app defaults to demo/mock mode, so it should run without sensors.
-
-## Run In Mock Mode
-
-Mock mode is the default. You can also force it explicitly:
-
-```powershell
-$env:AGRISENSE_FORCE_MOCK="true"
-streamlit run app/dashboard/streamlit_app.py
-```
-
-Use the sidebar to choose a region such as Coastal Recovery Zone, Urban Relief Hub, Dry Inland Cooperative, or Mountain Valley Site.
-
-## Connect Real Sensors Later
-
-On the Raspberry Pi:
+### Linux / macOS / Raspberry Pi
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install -r requirements-hardware.txt
-export AGRISENSE_FORCE_MOCK=false
-export ARDUINO_PORT=/dev/ttyACM0
-streamlit run app/dashboard/streamlit_app.py --server.address 0.0.0.0
-```
-
-On Windows with an Arduino connected:
-
-```powershell
-$env:AGRISENSE_FORCE_MOCK="false"
-$env:ARDUINO_PORT="COM3"
 streamlit run app/dashboard/streamlit_app.py
 ```
 
-If any sensor fails, the app logs a warning in Sensor diagnostics and fills the missing values with mock data.
+Open `http://localhost:8501`.
 
-## Optional Local AI
+## Mock Mode and Live Mode
 
-The current recommendation layer is deterministic and offline-safe. To try Ollama later:
+- Dashboard defaults to mock-friendly behavior and never hard-crashes on sensor failures.
+- In the sidebar, choose:
+  - `Demo/mock mode`
+  - `Live sensor mode` (with automatic backfill for missing signals)
+
+You can force mock mode by env var:
 
 ```bash
-export OLLAMA_HOST=http://localhost:11434
-export OLLAMA_MODEL=llama3.2
+export SINAI_FORCE_MOCK=true
 ```
 
-The service is already abstracted in `app/services/ai_recommender.py`.
+Legacy compatibility is kept for `AGRISENSE_FORCE_MOCK`.
 
-## Hackathon Demo Script
+## Raspberry Pi + Ollama Mini (Recommended for Demo)
 
-1. Open with the problem: after disasters, communities may lose internet access and supply chains, but local food decisions still need to happen.
-2. Show the Raspberry Pi and Arduino architecture: local sensors feed an edge dashboard.
-3. Open the dashboard and select a scenario like Hurricane recovery.
-4. Point to the environmental cards: the system converts raw readings into explainable labels.
-5. Show the top 3 crops and explain that scoring prioritizes crop fit, fast harvest, and resilience.
-6. Open Sensor diagnostics and mention that mock fallback keeps field demos reliable.
-7. Close with the business model: recurring analytics and AI recommendations per deployment site for NGOs, governments, co-ops, and disaster agencies.
+Fast path:
 
-## Where To Customize
+```bash
+bash docs/install_ollama_mini_pi.sh llama3.2:1b /home/pi/Sinai
+```
 
-- Edit crops and scoring inputs in `app/data/crops.json`.
-- Tune classification thresholds in `app/services/normalization.py`.
-- Adjust crop ranking weights in `app/services/crop_engine.py`.
-- Swap in a real local model in `app/services/ai_recommender.py`.
-- Change dashboard copy and layout in `app/dashboard/streamlit_app.py`.
-- Update hardware wiring notes in `docs/hardware_architecture.md`.
+Detailed instructions:
+
+- `docs/pi_ollama_deployment.md`
+
+Important environment variables:
+
+- `OLLAMA_HOST` or `SINAI_OLLAMA_HOST` (example: `http://127.0.0.1:11434`)
+- `OLLAMA_MODEL` or `SINAI_OLLAMA_MODEL` (default: `llama3.2:1b`)
+
+## Multi-User Offline Access
+
+Run Streamlit on all interfaces:
+
+```bash
+streamlit run app/dashboard/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+```
+
+Nearby users on the same network open:
+
+```text
+http://<pi-ip>:8501
+```
+
+For strongest offline story, use Pi hotspot mode and let all demo devices join that SSID.
+
+## Arduino Sketch
+
+Upload:
+
+- `arduino/grove_light_serial.ino`
+
+This sends light readings over serial for Pi ingestion.
+
+## Hackathon Demo Flow (3-4 minutes)
+
+1. Open with disruption problem: no cloud, no stable supply chains, but food decisions still needed.
+2. Show Sinai dashboard live with current field profile and top crop strategy.
+3. Open `Local LLM Advisor` tab and ask an operational question.
+4. Open `Edge Deployment` tab to show local-network URLs and Pi deployment readiness.
+5. Close with B2B model: deploy per site for NGOs/agencies with recurring analytics + AI guidance.
+
+## Where To Customize Quickly
+
+- Crop library and metadata: `app/data/crops.json`
+- Scoring weights and ranking: `app/services/crop_engine.py`
+- Classification thresholds: `app/services/normalization.py`
+- Local LLM behavior/fallback: `app/services/local_ai_advisor.py`
+- UI copy, layout, visuals: `app/dashboard/streamlit_app.py`
+- Pi deployment setup: `docs/pi_ollama_deployment.md`
 
 ## Notes
 
-This MVP is intentionally reliability-first. It is built to demo well even if the hardware kit is incomplete, the serial port changes, or I2C sensors are unavailable during judging.
+Sinai is intentionally reliability-first for live judging:
+
+- sensor read failures degrade gracefully
+- mock data preserves demo continuity
+- recommendation engine remains deterministic
+- local AI layer improves explainability without becoming a single point of failure

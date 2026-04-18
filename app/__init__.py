@@ -1,1 +1,1 @@
-"""AgriSense AI application package."""
+"""Sinai application package."""

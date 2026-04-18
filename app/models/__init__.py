@@ -1,1 +1,1 @@
-"""Shared domain models for AgriSense AI."""
+"""Shared domain models for Sinai."""

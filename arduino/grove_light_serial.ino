@@ -1,5 +1,5 @@
 /*
-  AgriSense AI Grove Light Sensor bridge
+  Sinai Grove Light Sensor bridge
 
   Hardware:
   - Grove Light Sensor signal pin connected to Arduino A0

@@ -19,7 +19,7 @@ class AppConfig:
     spa06_i2c_bus: int = 1
     spa06_i2c_address: int = 0x77
     ollama_host: str | None = None
-    ollama_model: str = "llama3.2"
+    ollama_model: str = "llama3.2:1b"
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -29,13 +29,21 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _first_env(*names: str) -> str | None:
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return None
+
+
 def get_config() -> AppConfig:
     return AppConfig(
-        force_mock=_env_bool("AGRISENSE_FORCE_MOCK", False),
+        force_mock=_env_bool("SINAI_FORCE_MOCK", _env_bool("AGRISENSE_FORCE_MOCK", False)),
         arduino_port=os.getenv("ARDUINO_PORT"),
         arduino_baud=int(os.getenv("ARDUINO_BAUD", "9600")),
         spa06_i2c_bus=int(os.getenv("SPA06_I2C_BUS", "1")),
         spa06_i2c_address=int(os.getenv("SPA06_I2C_ADDRESS", "0x77"), 16),
-        ollama_host=os.getenv("OLLAMA_HOST"),
-        ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+        ollama_host=_first_env("SINAI_OLLAMA_HOST", "OLLAMA_HOST"),
+        ollama_model=_first_env("SINAI_OLLAMA_MODEL", "OLLAMA_MODEL") or "llama3.2:1b",
     )

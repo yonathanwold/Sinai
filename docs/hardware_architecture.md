@@ -1,6 +1,6 @@
 # Hardware Architecture
 
-AgriSense AI is designed as a local-first edge deployment. The Raspberry Pi is the main controller, local AI host, and dashboard server. The Arduino acts as a simple analog bridge for the Grove Light Sensor.
+Sinai is designed as a local-first edge deployment. The Raspberry Pi is the main controller, local AI host, and dashboard server. The Arduino acts as a simple analog bridge for the Grove Light Sensor.
 
 ## Components
 
@@ -40,10 +40,11 @@ The app defaults to demo/mock mode so the hackathon presentation is reliable. In
 
 | Variable | Purpose | Example |
 | --- | --- | --- |
-| `AGRISENSE_FORCE_MOCK` | Keep mock mode forced even if live mode is selected | `false` |
+| `SINAI_FORCE_MOCK` | Keep mock mode forced even if live mode is selected | `false` |
 | `ARDUINO_PORT` | Arduino serial device | `/dev/ttyACM0` or `COM3` |
 | `ARDUINO_BAUD` | Arduino serial baud rate | `9600` |
 | `SPA06_I2C_BUS` | Raspberry Pi I2C bus | `1` |
 | `SPA06_I2C_ADDRESS` | Pressure sensor address | `0x77` |
 | `OLLAMA_HOST` | Optional local model endpoint | `http://localhost:11434` |
-| `OLLAMA_MODEL` | Optional Ollama model name | `llama3.2` |
+| `OLLAMA_MODEL` | Optional Ollama model name | `llama3.2:1b` |
+| `AGRISENSE_FORCE_MOCK` | Legacy compatibility alias for `SINAI_FORCE_MOCK` | `false` |
