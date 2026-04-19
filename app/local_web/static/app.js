@@ -26,6 +26,9 @@ const deviceCount = document.getElementById("deviceCount");
 const queueCount = document.getElementById("queueCount");
 const queueNext = document.getElementById("queueNext");
 const queueList = document.getElementById("queueList");
+const modelPhase = document.getElementById("modelPhase");
+const modelProgressBar = document.getElementById("modelProgressBar");
+const modelProgressText = document.getElementById("modelProgressText");
 const sensorTimestamp = document.getElementById("sensorTimestamp");
 const sensorFeedList = document.getElementById("sensorFeedList");
 const sensorWarnings = document.getElementById("sensorWarnings");
@@ -78,6 +81,7 @@ const state = {
   wsRetryTimer: null,
   wsPingTimer: null,
   healthTimer: null,
+  modelProgressTimer: null,
   monitorPollTimer: null,
   monitorMode: "assistant",
   feed: [],
@@ -97,6 +101,7 @@ const state = {
     next_question: null,
     next_device_name: null,
   },
+  modelProgress: null,
 };
 
 function setConnectionStatus(text, variant = "warn") {
@@ -390,6 +395,47 @@ function renderQueueStatus() {
       clientQueueStatus.textContent = "Queue ready.";
     }
   }
+}
+
+function renderModelProgress() {
+  const progress = state.modelProgress || {};
+  const phase = progress.phase || "unknown";
+  const percent =
+    progress.percent === null || progress.percent === undefined
+      ? null
+      : Math.max(0, Math.min(100, Number(progress.percent)));
+
+  if (modelPhase) {
+    modelPhase.textContent = phase.replaceAll("_", " ");
+  }
+  if (modelProgressBar) {
+    modelProgressBar.style.width = `${Number.isFinite(percent) ? percent : 12}%`;
+  }
+  if (modelProgressText) {
+    modelProgressText.textContent = progress.message || "Waiting for local model setup status.";
+  }
+}
+
+async function refreshModelProgress() {
+  try {
+    state.modelProgress = await fetchJson("/api/ollama/progress");
+  } catch {
+    state.modelProgress = {
+      phase: "unknown",
+      percent: null,
+      message: "Model setup status is temporarily unavailable.",
+    };
+  }
+  renderModelProgress();
+}
+
+function scheduleModelProgressChecks() {
+  if (state.modelProgressTimer) {
+    clearInterval(state.modelProgressTimer);
+  }
+  state.modelProgressTimer = window.setInterval(() => {
+    refreshModelProgress();
+  }, 3000);
 }
 
 function applyMetricValue(element, valueText) {
@@ -926,8 +972,10 @@ function bindClientEvents() {
 async function initMonitor() {
   bindMonitorEvents();
   updateMonitorMode("assistant");
+  await refreshModelProgress();
   await fetchMonitorSnapshots();
   connectRealtime();
+  scheduleModelProgressChecks();
   if (state.monitorPollTimer) {
     clearInterval(state.monitorPollTimer);
   }

@@ -46,6 +46,9 @@ SITE_NAME = os.getenv("SINAI_SITE_NAME", "Sinai Local Node A-17")
 DATA_POLL_INTERVAL = float(os.getenv("SINAI_DATA_POLL_INTERVAL", "1.2"))
 DEFAULT_DATA_MODE = os.getenv("SINAI_MONITOR_DATA_MODE", "live")
 ARDUINO_STALE_SECONDS = float(os.getenv("SINAI_ARDUINO_STALE_SECONDS", "25"))
+OLLAMA_PROGRESS_PATH = Path(
+    os.getenv("SINAI_OLLAMA_PROGRESS_PATH", "/boot/firmware/sinai-ollama-progress.json")
+)
 
 
 app = FastAPI(
@@ -833,6 +836,34 @@ async def get_data_live() -> dict[str, object]:
 @app.get("/api/queue/status")
 def get_queue_status() -> dict[str, object]:
     return prompt_queue.snapshot()
+
+
+@app.get("/api/ollama/progress")
+def get_ollama_progress() -> dict[str, object]:
+    if not OLLAMA_PROGRESS_PATH.exists():
+        return {
+            "phase": "unknown",
+            "percent": None,
+            "message": "Waiting for local model setup status.",
+            "updated_at": None,
+        }
+
+    try:
+        payload = json.loads(OLLAMA_PROGRESS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {
+            "phase": "unknown",
+            "percent": None,
+            "message": "Local model status is temporarily unavailable.",
+            "updated_at": None,
+        }
+
+    return {
+        "phase": payload.get("phase", "unknown"),
+        "percent": payload.get("percent"),
+        "message": payload.get("message", "Local model setup is running."),
+        "updated_at": payload.get("updated_at"),
+    }
 
 
 @app.post("/api/data/ingest")
