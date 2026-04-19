@@ -12,10 +12,16 @@ This guide turns Sinai into a portable offline decision node:
 From the Sinai repo on Raspberry Pi:
 
 ```bash
-bash docs/install_ollama_mini_pi.sh llama3.2:1b /home/pi/Sinai
+bash docs/install_sinai_web_pi.sh llama3.2:1b /home/pi/Sinai
 ```
 
-This installs Ollama, pulls `llama3.2:1b`, installs Python deps, and creates `sinai-dashboard` as a systemd service.
+This installs Ollama, pulls `llama3.2:1b`, installs Python deps, and creates `sinai-web` (FastAPI local web app) as a systemd service.
+
+If you still need the Streamlit dashboard service flow, use:
+
+```bash
+bash docs/install_ollama_mini_pi.sh llama3.2:1b /home/pi/Sinai
+```
 
 ## 2. Manual setup (if you prefer)
 
@@ -34,7 +40,7 @@ pip install -r requirements-hardware.txt
 export OLLAMA_HOST=http://127.0.0.1:11434
 export OLLAMA_MODEL=llama3.2:1b
 export SINAI_FORCE_MOCK=false
-streamlit run app/dashboard/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+uvicorn app.local_web.server:app --host 0.0.0.0 --port 8501
 ```
 
 ## 3. Local network access

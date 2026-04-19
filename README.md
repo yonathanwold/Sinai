@@ -68,6 +68,7 @@ Sinai/
   docs/
     hardware_architecture.md
     install_ollama_mini_pi.sh
+    install_sinai_web_pi.sh
     pi_ollama_deployment.md
   requirements.txt
   requirements-hardware.txt
@@ -128,6 +129,17 @@ Open:
 streamlit run app/dashboard/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
 ```
 
+## Raspberry Pi One-Command Setup (FastAPI Web App)
+
+On the Pi, run:
+
+```bash
+cd /home/pi/Sinai
+bash docs/install_sinai_web_pi.sh llama3.2:1b /home/pi/Sinai
+```
+
+This installs system dependencies, Ollama, the model, Python packages, and configures `sinai-web` as a startup service.
+
 ## Network Demo (Phone/Laptop)
 
 1. Ensure host machine and demo devices are on the same network.
@@ -169,4 +181,3 @@ Sinai is configured to:
 - Context construction and top crops: `app/local_web/services/context_provider.py`
 - Ollama behavior/model selection: `app/local_web/services/ollama_client.py`
 - Chat UI and interaction: `app/local_web/static/index.html`, `app/local_web/static/styles.css`, `app/local_web/static/app.js`
-
