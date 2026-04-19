@@ -133,6 +133,8 @@ EOF
 
 configure_web_service() {
   log "Ensuring Sinai web service starts on boot."
+  systemctl disable --now nginx apache2 caddy lighttpd >/dev/null 2>&1 || true
+  pkill -f 'uvicorn app.local_web.server:app' >/dev/null 2>&1 || true
   if [ -d "${TARGET_DIR}" ]; then
     cat >/etc/systemd/system/sinai-web.service <<EOF
 [Unit]
@@ -152,13 +154,10 @@ Environment=SINAI_OLLAMA_TIMEOUT=60
 Environment=SINAI_OLLAMA_MAX_TOKENS=80
 Environment=SINAI_OLLAMA_CONTEXT_WINDOW=1536
 Environment=SINAI_OLLAMA_KEEP_ALIVE=20m
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
-NoNewPrivileges=true
-ExecStart=${TARGET_DIR}/.venv/bin/uvicorn app.local_web.server:app --host 0.0.0.0 --port 80
+ExecStart=/bin/bash -lc '${TARGET_DIR}/.venv/bin/uvicorn app.local_web.server:app --host 0.0.0.0 --port 80 >> ${BOOT_DIR}/sinai-web.log 2>&1'
 Restart=always
-RestartSec=3
-User=pi
+RestartSec=1
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target
@@ -262,6 +261,7 @@ EOF
 
 configure_hotspot() {
   log "Configuring self-contained WPA2 hotspot using hostapd and dnsmasq."
+  systemctl disable --now nginx apache2 caddy lighttpd >/dev/null 2>&1 || true
 
   cat >/usr/local/sbin/sinai-hotspot-start.sh <<EOF
 #!/usr/bin/env bash
