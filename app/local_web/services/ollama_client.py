@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -31,11 +32,16 @@ class OllamaClient:
             or "llama3.2:1b"
         )
         self.request_timeout_seconds = int(os.getenv("SINAI_OLLAMA_TIMEOUT", "240"))
-        self.max_tokens = int(os.getenv("SINAI_OLLAMA_MAX_TOKENS", "140"))
+        self.max_tokens = int(os.getenv("SINAI_OLLAMA_MAX_TOKENS", "96"))
+        self.context_window = int(os.getenv("SINAI_OLLAMA_CONTEXT_WINDOW", "2048"))
+        self.keep_alive = os.getenv("SINAI_OLLAMA_KEEP_ALIVE", "20m")
+        self.tags_cache_ttl_seconds = int(os.getenv("SINAI_OLLAMA_TAGS_CACHE_TTL", "30"))
+        self._cached_models: list[str] = []
+        self._cache_expires_at = 0.0
 
     def health(self) -> OllamaHealth:
         try:
-            tags = self._fetch_tags()
+            models = self._available_models(force_refresh=False)
         except (urllib.error.URLError, OSError, TimeoutError, json.JSONDecodeError):
             return OllamaHealth(
                 ok=False,
@@ -43,7 +49,6 @@ class OllamaClient:
                 active_model=None,
             )
 
-        models = [str(item.get("name", "")).strip() for item in tags.get("models", [])]
         model = self._select_model(models)
         if not models:
             return OllamaHealth(
@@ -58,9 +63,7 @@ class OllamaClient:
         )
 
     def chat(self, messages: list[dict[str, str]]) -> tuple[str, str]:
-        tags = self._fetch_tags()
-        models = [str(item.get("name", "")).strip() for item in tags.get("models", [])]
-        model = self._select_model(models)
+        model = self._select_model(self._available_models(force_refresh=False))
         if not model:
             raise RuntimeError("No Ollama model is available. Run `ollama pull <model>` first.")
 
@@ -68,12 +71,14 @@ class OllamaClient:
             "model": model,
             "messages": messages,
             "stream": False,
+            "keep_alive": self.keep_alive,
             # Qwen-family models can emit "thinking" instead of direct content.
             # For a user-facing chat UX we disable that mode.
             "think": False,
             "options": {
                 "temperature": 0.2,
                 "num_predict": self.max_tokens,
+                "num_ctx": self.context_window,
             },
         }
         body = json.dumps(payload).encode("utf-8")
@@ -98,6 +103,22 @@ class OllamaClient:
             raise RuntimeError("Ollama returned an empty response.")
 
         return content, model
+
+    def _available_models(self, *, force_refresh: bool) -> list[str]:
+        now = time.monotonic()
+        if (
+            not force_refresh
+            and self._cached_models
+            and now < self._cache_expires_at
+        ):
+            return list(self._cached_models)
+
+        tags = self._fetch_tags()
+        models = [str(item.get("name", "")).strip() for item in tags.get("models", [])]
+        self._cached_models = [model for model in models if model]
+        ttl_seconds = max(3, self.tags_cache_ttl_seconds)
+        self._cache_expires_at = now + ttl_seconds
+        return list(self._cached_models)
 
     def _fetch_tags(self) -> dict[str, object]:
         request = urllib.request.Request(

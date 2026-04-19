@@ -66,6 +66,14 @@
                 </div>
                 <ul id="activityList" class="activity-list"></ul>
               </div>
+              <div class="rail-section">
+                <div class="rail-head">
+                  <h3>Prompt Queue</h3>
+                  <span id="queueCount">0 waiting</span>
+                </div>
+                <div id="queueNext" class="queue-next">No queued prompts.</div>
+                <ul id="queueList" class="queue-list"></ul>
+              </div>
             </aside>
           </div>
         </section>
@@ -157,6 +165,7 @@
             <label for="clientRegionSelect">Region</label>
             <select id="clientRegionSelect"></select>
           </section>
+          <div id="clientQueueStatus" class="client-queue-status">Queue ready.</div>
 
           <section id="clientChatLog" class="client-log"></section>
 

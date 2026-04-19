@@ -23,6 +23,9 @@ const monitorFeedList = document.getElementById("monitorFeedList");
 const deviceList = document.getElementById("deviceList");
 const activityList = document.getElementById("activityList");
 const deviceCount = document.getElementById("deviceCount");
+const queueCount = document.getElementById("queueCount");
+const queueNext = document.getElementById("queueNext");
+const queueList = document.getElementById("queueList");
 const sensorTimestamp = document.getElementById("sensorTimestamp");
 const sensorFeedList = document.getElementById("sensorFeedList");
 const sensorWarnings = document.getElementById("sensorWarnings");
@@ -64,6 +67,7 @@ const clientTypingRow = document.getElementById("clientTypingRow");
 const clientModeSelect = document.getElementById("clientModeSelect");
 const clientRegionSelect = document.getElementById("clientRegionSelect");
 const deviceChip = document.getElementById("deviceChip");
+const clientQueueStatus = document.getElementById("clientQueueStatus");
 
 const identityModal = document.getElementById("identityModal");
 const deviceNameInput = document.getElementById("deviceNameInput");
@@ -86,6 +90,14 @@ const state = {
   region: null,
   mode: "live",
   clientBusy: false,
+  queue: {
+    queued: 0,
+    processing: false,
+    pending_total: 0,
+    items: [],
+    next_question: null,
+    next_device_name: null,
+  },
 };
 
 function setConnectionStatus(text, variant = "warn") {
@@ -291,6 +303,66 @@ function renderDeviceList() {
       const action = item.role === "assistant" ? "reply" : "prompt";
       li.textContent = `${item.device_name || "Unknown"} - ${action} - ${formatTime(item.timestamp_utc)}`;
       activityList.appendChild(li);
+    }
+  }
+}
+
+function renderQueueStatus() {
+  const queue = state.queue || {};
+  const items = queue.items || [];
+  const pending = Number(queue.pending_total || 0);
+  const queued = Number(queue.queued || 0);
+  const nextQuestion = queue.next_question || "";
+  const nextDevice = queue.next_device_name || "";
+
+  if (queueCount) {
+    queueCount.textContent = `${queued} waiting`;
+  }
+  if (queueNext) {
+    queueNext.textContent = nextQuestion
+      ? `Next: ${nextDevice || "Device"} - ${nextQuestion}`
+      : pending > 0
+        ? "One prompt is processing."
+        : "No queued prompts.";
+  }
+  if (queueList) {
+    queueList.innerHTML = "";
+    if (items.length === 0) {
+      const li = document.createElement("li");
+      li.className = "queue-row empty";
+      li.textContent = pending > 0 ? "Processing current prompt..." : "Queue is empty.";
+      queueList.appendChild(li);
+    } else {
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "queue-row";
+        li.innerHTML = `
+          <div class="queue-pos">#${item.position}</div>
+          <div class="queue-text">
+            <div class="queue-device">${item.device_name || "Device"}</div>
+            <div class="queue-question"></div>
+          </div>
+        `;
+        const q = li.querySelector(".queue-question");
+        if (q) {
+          q.textContent = item.question || "";
+        }
+        queueList.appendChild(li);
+      });
+    }
+  }
+
+  if (clientQueueStatus) {
+    const mySessionId = state.sessionId || "";
+    const myIndex = items.findIndex((item) => item.session_id === mySessionId);
+    if (myIndex >= 0) {
+      clientQueueStatus.textContent = `You are #${myIndex + 1} in queue.`;
+    } else if (state.clientBusy && pending > 0) {
+      clientQueueStatus.textContent = "Your prompt is being processed...";
+    } else if (pending > 0) {
+      clientQueueStatus.textContent = `${queued} waiting. Next: ${nextDevice || "Device"}`;
+    } else {
+      clientQueueStatus.textContent = "Queue ready.";
     }
   }
 }
@@ -502,6 +574,9 @@ async function sendClientMessage(rawText) {
   clientInput.value = "";
   resizeClientInput();
   setClientBusy(true);
+  if (clientQueueStatus) {
+    clientQueueStatus.textContent = "Submitting to queue...";
+  }
 
   try {
     const payload = await fetchJson("/api/chat", {
@@ -515,6 +590,13 @@ async function sendClientMessage(rawText) {
       }),
     });
     state.clientMessages = payload.history || state.clientMessages;
+    if (payload.queue) {
+      state.queue = {
+        ...state.queue,
+        ...payload.queue,
+      };
+      renderQueueStatus();
+    }
     renderClientMessages();
   } catch {
     state.clientMessages.push({
@@ -578,6 +660,13 @@ function handleSocketEvent(payload) {
       state.sensorData = payload.data;
       renderSensorData();
     }
+    if (payload.queue) {
+      state.queue = {
+        ...state.queue,
+        ...payload.queue,
+      };
+      renderQueueStatus();
+    }
     return;
   }
 
@@ -603,6 +692,15 @@ function handleSocketEvent(payload) {
   if (type === "device_snapshot") {
     state.devices = payload.devices || [];
     renderDeviceList();
+    return;
+  }
+
+  if (type === "queue_status") {
+    state.queue = {
+      ...state.queue,
+      ...payload,
+    };
+    renderQueueStatus();
     return;
   }
 
@@ -632,9 +730,16 @@ function handleSocketEvent(payload) {
     state.feed = payload.feed || [];
     state.devices = payload.devices || [];
     state.sensorData = payload.data || null;
+    if (payload.queue) {
+      state.queue = {
+        ...state.queue,
+        ...payload.queue,
+      };
+    }
     renderMonitorFeed();
     renderDeviceList();
     renderSensorData();
+    renderQueueStatus();
   }
 }
 
@@ -681,17 +786,23 @@ function connectRealtime() {
 
 async function fetchMonitorSnapshots() {
   try {
-    const [feedPayload, devicePayload, dataPayload] = await Promise.all([
+    const [feedPayload, devicePayload, dataPayload, queuePayload] = await Promise.all([
       fetchJson("/api/live-feed?limit=40"),
       fetchJson("/api/devices"),
       fetchJson("/api/data/live"),
+      fetchJson("/api/queue/status"),
     ]);
     state.feed = feedPayload.items || [];
     state.devices = devicePayload.devices || [];
     state.sensorData = dataPayload || null;
+    state.queue = {
+      ...state.queue,
+      ...queuePayload,
+    };
     renderMonitorFeed();
     renderDeviceList();
     renderSensorData();
+    renderQueueStatus();
   } catch {
     // Monitor view recovers on next cycle.
   }
@@ -811,6 +922,16 @@ async function initClient() {
   await ensureClientIdentity();
   await fetchClientContextOptions();
   await fetchClientHistory();
+  try {
+    const queuePayload = await fetchJson("/api/queue/status");
+    state.queue = {
+      ...state.queue,
+      ...queuePayload,
+    };
+    renderQueueStatus();
+  } catch {
+    // Ignore transient queue fetch failures.
+  }
   resizeClientInput();
   connectRealtime();
 }

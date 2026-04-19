@@ -487,6 +487,7 @@ class DataIngestRequest(BaseModel):
 @dataclass
 class PromptQueueJob:
     session_id: str
+    device_name: str
     question: str
     payload: "ChatRequest"
     enqueued_at_utc: str
@@ -504,10 +505,24 @@ class PromptQueueProcessor:
     def snapshot(self) -> dict[str, object]:
         queued = self._queue.qsize()
         processing = self._processing
+        preview: list[dict[str, object]] = []
+        for idx, queued_job in enumerate(list(self._queue._queue)[:8], start=1):  # noqa: SLF001
+            preview.append(
+                {
+                    "position": idx,
+                    "session_id": queued_job.session_id,
+                    "device_name": queued_job.device_name,
+                    "question": queued_job.question[:180],
+                    "enqueued_at_utc": queued_job.enqueued_at_utc,
+                }
+            )
         return {
             "queued": queued,
             "processing": processing,
             "pending_total": queued + (1 if processing else 0),
+            "items": preview,
+            "next_question": preview[0]["question"] if preview else None,
+            "next_device_name": preview[0]["device_name"] if preview else None,
         }
 
     async def start(self) -> None:
@@ -818,7 +833,7 @@ async def reset_history(request: Request) -> dict[str, object]:
 @app.post("/api/chat")
 async def chat(request: Request, payload: ChatRequest) -> dict[str, object]:
     session_id = _get_session_id(request)
-    session_store.touch_device(session_id)
+    profile = session_store.touch_device(session_id)
     question = payload.message.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
@@ -828,6 +843,7 @@ async def chat(request: Request, payload: ChatRequest) -> dict[str, object]:
     queued_snapshot = prompt_queue.snapshot()
     job = PromptQueueJob(
         session_id=session_id,
+        device_name=str(profile.get("device_name", "Unknown device")),
         question=question,
         payload=payload,
         enqueued_at_utc=datetime.now(timezone.utc).isoformat(),
