@@ -31,7 +31,7 @@ class OllamaClient:
             or "llama3.2:1b"
         )
         self.request_timeout_seconds = int(os.getenv("SINAI_OLLAMA_TIMEOUT", "240"))
-        self.max_tokens = int(os.getenv("SINAI_OLLAMA_MAX_TOKENS", "220"))
+        self.max_tokens = int(os.getenv("SINAI_OLLAMA_MAX_TOKENS", "140"))
 
     def health(self) -> OllamaHealth:
         try:

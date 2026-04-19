@@ -1,199 +1,261 @@
 # Sinai
 
-**Sinai — Offline AI for resilient food systems and environmental decisions.**
+Sinai is a **local-first multi-device assistant platform** for live demos.
 
-Sinai is a local-network AI assistant for low-resource and disaster-prone environments.  
-It runs on a Raspberry Pi or local machine, uses local sensor/mock context, and answers mission-oriented questions through a chat-first web interface powered by Ollama.
+It is designed for hackathon judging:
+- one shared monitor view for the room
+- many phone clients with clear device identity
+- a dedicated Data Mode fed by live Arduino/sensor readings
+- realtime sync across monitor, phones, and sensor updates
+- local execution on laptop or Raspberry Pi (no cloud dependency required)
 
-## Why This MVP Matters
+## Final Demo Surfaces
 
-Sinai demonstrates a product-level concept, not a sensor script:
+### 1) Main Monitor (`/monitor`)
+- **Assistant Mode**: shared feed of prompts + assistant responses
+- **Data Mode**: live sensor dashboard with readable metrics and update feed
+- connected devices list and recent activity
+- clear per-device names and accents
 
-- local AI assistant as the primary workflow
-- context-aware guidance with environmental signals
-- resilient operation when internet access is unreliable
-- accessible to multiple nearby users from phones/laptops over local Wi-Fi
+### 2) Phone Client (`/client`)
+- first-join device naming
+- persisted identity in local storage
+- prompt input and response history
+- touch-friendly composer and fast send flow
 
-Crop recommendation is included, but as one capability among broader resilience decision support.
+### 3) Arduino Data Feed
+- ingest endpoint: `POST /api/data/ingest`
+- serial bridge script: `arduino/serial_to_sinai.py`
+- merged into Data Mode in near realtime
 
-## Main Features
+---
 
-- Chat-first UI (primary screen)
-- Local Ollama integration (`/api/chat`)
-- Context injection (temperature, pressure, UV, light, air quality, summary, top crops, risk flags)
-- Mock or live sensor mode
-- Session-based history (in-memory + browser session storage)
-- Shared live prompt feed across all connected sessions
-- Quick action prompts for:
-  - Analyze conditions
-  - Recommend crops
-  - Explain risks
-  - Suggest resilient next steps
-- Local AI status indicator (`Local AI Running` or fallback mode)
-
-## Project Structure
+## Recommended Project Structure
 
 ```text
 Sinai/
   app/
     local_web/
-      server.py
-      static/
-        index.html
-        styles.css
-        app.js
+      server.py                        # FastAPI app + websockets + data ingest
       services/
-        context_provider.py
-        fallback_assistant.py
-        ollama_client.py
-        prompting.py
-        session_store.py
-    dashboard/
-      streamlit_app.py
-    data/
-      crops.json
-    models/
-      crop.py
-      environmental.py
+        context_provider.py            # Context construction (live/mock)
+        fallback_assistant.py          # Fallback response path
+        ollama_client.py               # Local Ollama client
+        prompting.py                   # System prompt + message assembly
+        session_store.py               # Device identity + session/feed state
+      static/
+        index.html                     # Monitor + client surfaces
+        app.js                         # Realtime UI logic and rendering
+        styles.css                     # Production-ready demo styling
     services/
-      ai_recommender.py
-      crop_engine.py
-      local_ai_advisor.py
-      normalization.py
-      sensor_ingestion.py
-    utils/
-      config.py
-      formatting.py
+      sensor_ingestion.py              # Hardware/mock sensor acquisition
+      normalization.py                 # Sensor label classification
+    models/
+      environmental.py                 # Sensor domain models
   arduino/
-    grove_light_serial.ino
+    grove_light_serial.ino             # Example Arduino sketch (JSON serial lines)
+    serial_to_sinai.py                 # Serial -> Sinai ingest bridge
   docs/
-    hardware_architecture.md
+    install_sinai_web_pi.sh            # One-command Pi setup
+    setup_pi_hotspot_portal.sh         # Pi hotspot + captive redirect
     install_ollama_mini_pi.sh
-    install_sinai_web_pi.sh
-    setup_pi_hotspot_portal.sh
     pi_ollama_deployment.md
   requirements.txt
   requirements-hardware.txt
 ```
 
-## Backend Architecture (Local Web)
+---
 
-- **FastAPI server**: `app/local_web/server.py`
-- **Chat endpoint**: `POST /api/chat`
-- **Context endpoint**: `GET /api/context`
-- **Health endpoint**: `GET /api/health`
-- **Session history**: `GET /api/history`, `POST /api/reset`
+## Architecture Summary
 
-Flow:
+### Runtime Components
+- **FastAPI server** (`app/local_web/server.py`)
+  - REST API for chat, context, history, devices, and data ingest
+  - WebSocket endpoint for low-latency monitor/client updates
+  - background sensor polling loop for dashboard freshness
+- **SessionStore**
+  - per-device identity (name, color, message count, connection state)
+  - per-session chat history
+  - shared monitor feed
+- **SensorFeedState**
+  - baseline sensor frames from live/mock provider
+  - optional Arduino bridge overlay with stale-time handling
+  - rolling history + trend series for Data Mode
+- **Ollama path + fallback path**
+  - local LLM via Ollama when available
+  - deterministic fallback response when unavailable
 
-1. Collect environment context (mock/live).
-2. Build system + context-grounded prompt.
-3. Send to Ollama.
-4. Return action-oriented response for resilience planning.
-5. If Ollama is unavailable, use deterministic fallback guidance.
+### Realtime Data Flow
+1. Phone opens `/client`, joins with device name.
+2. Device identity is registered and persisted.
+3. Prompt is sent to `POST /api/chat`.
+4. Prompt + reply events are broadcast to monitor through websocket.
+5. Phone receives updated history/reply and keeps identity attached.
 
-## Local Setup
+### Arduino Data Flow
+1. Arduino emits JSON lines over serial (USB).
+2. `arduino/serial_to_sinai.py` parses and posts readings to `POST /api/data/ingest`.
+3. Server merges readings into current sensor frame.
+4. Data Mode updates instantly on monitor via websocket broadcasts.
 
-### 1) Install dependencies
+---
+
+## Local Run Instructions
+
+## 1) Install dependencies
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate   # Windows PowerShell: .\.venv\Scripts\Activate.ps1
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 2) Configure Ollama (optional but recommended)
+## 2) (Recommended) Ensure Ollama is running
 
 ```bash
-export OLLAMA_HOST=http://127.0.0.1:11434
-export OLLAMA_MODEL=llama3.2:1b
+ollama serve
+ollama pull llama3.2:1b
 ```
 
-Sinai also accepts:
-
-- `SINAI_OLLAMA_HOST`
-- `SINAI_OLLAMA_MODEL`
-
-### 3) Run the local web app (chat-first demo)
+## 3) Start Sinai server
 
 ```bash
-uvicorn app.local_web.server:app --host 0.0.0.0 --port 8501 --reload
+uvicorn app.local_web.server:app --host 0.0.0.0 --port 8501
 ```
 
 Open:
+- monitor: `http://<host-ip>:8501/monitor`
+- phone: `http://<host-ip>:8501/client`
 
-- Local machine: `http://localhost:8501`
-- Same Wi-Fi device: `http://<your-ip>:8501`
+If you open `/` directly, default surface is the phone/client flow.
 
-### 4) (Optional) Streamlit dashboard
+## 4) Optional Arduino bridge
 
 ```bash
-streamlit run app/dashboard/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+python arduino/serial_to_sinai.py --port /dev/ttyACM0 --server http://127.0.0.1:8501
 ```
 
-## Raspberry Pi One-Command Setup (FastAPI Web App)
+Windows example:
 
-On the Pi, run:
+```bash
+python arduino/serial_to_sinai.py --port COM5 --server http://127.0.0.1:8501
+```
+
+---
+
+## API Notes
+
+### Chat
+- `POST /api/chat`
+- body:
+
+```json
+{
+  "message": "What should we prioritize next 24h?",
+  "mode": "live",
+  "site_name": "Sinai Local Node",
+  "region": "Coastal Recovery Zone"
+}
+```
+
+### Device Registration
+- `POST /api/device/register`
+- body:
+
+```json
+{
+  "device_name": "Judge Phone 1"
+}
+```
+
+### Arduino Data Ingest
+- `POST /api/data/ingest`
+- body:
+
+```json
+{
+  "source": "arduino-serial",
+  "device_name": "Arduino Uno",
+  "readings": {
+    "temperature_c": 27.3,
+    "humidity_percent": 56,
+    "soil_moisture_pct": 41,
+    "light_lux": 9120,
+    "uv_index": 4.2,
+    "air_quality_eco2_ppm": 742,
+    "air_quality_tvoc_ppb": 182,
+    "pressure_hpa": 1008.2
+  }
+}
+```
+
+---
+
+## Environment Variables
+
+### AI / Service
+- `OLLAMA_HOST` (default `http://127.0.0.1:11434`)
+- `OLLAMA_MODEL` (default from app config)
+- `SINAI_SESSION_SECRET`
+
+### Demo Behavior
+- `SINAI_SITE_NAME` (default `Sinai Local Node A-17`)
+- `SINAI_MONITOR_DATA_MODE` (`live` or `mock`, default `live`)
+- `SINAI_DATA_POLL_INTERVAL` (seconds, default `1.2`)
+- `SINAI_ARDUINO_STALE_SECONDS` (seconds, default `25`)
+
+---
+
+## Raspberry Pi Deployment Notes
+
+## One-command install on Pi
 
 ```bash
 cd /home/pi/Sinai
 bash docs/install_sinai_web_pi.sh llama3.2:1b /home/pi/Sinai
 ```
 
-This installs system dependencies, Ollama, the model, Python packages, and configures `sinai-web` as a startup service.
+This installs dependencies, pulls model, and creates `sinai-web` systemd service.
 
-## Raspberry Pi Hotspot + Auto Redirect (Local-Only)
+## Check services
 
-To let phones join Pi Wi-Fi and auto-redirect to Sinai:
+```bash
+systemctl status sinai-web --no-pager
+systemctl status ollama --no-pager
+```
+
+## Pi hotspot for local-only phone demo
 
 ```bash
 sudo bash docs/setup_pi_hotspot_portal.sh Sinai-Node SinaiDemo2026 192.168.50.1
 ```
 
-After setup, phones can join the Pi SSID and open:
+Then phones join Pi Wi-Fi and open:
+- `http://192.168.50.1:8501/client`
 
-- `http://192.168.50.1:8501`
+Use monitor/HDMI:
+- `http://127.0.0.1:8501/monitor`
 
-Most phones will trigger a captive portal pop-up automatically. If not, open that URL manually.
+---
 
-## Network Demo (Phone/Laptop)
+## Performance Decisions (for live judging reliability)
 
-1. Ensure host machine and demo devices are on the same network.
-2. Run Sinai with `--host 0.0.0.0`.
-3. Find your machine IP:
-   - macOS/Linux: `hostname -I` or `ip a`
-   - Windows: `ipconfig`
-4. Open `http://<ip>:8501` from phone browser.
+- reduced assistant response target length for faster generation
+- reduced Ollama token ceiling for faster turnaround
+- websocket-first realtime updates for monitor/client
+- fallback polling only when websocket is disconnected
+- lightweight DOM updates and bounded feed/history windows
+- rolling sensor history for sparkline rendering (small in-memory footprint)
+- reconnect handling for phones that refresh or temporarily drop Wi-Fi
 
-## Sensor and Context Notes
+---
 
-- In **mock mode**, Sinai generates realistic region-based environmental context.
-- In **live mode**, Sinai attempts hardware reads and auto-backfills missing values with mock data.
-- Legacy force-mock env var remains supported:
-  - `SINAI_FORCE_MOCK=true`
-  - compatibility alias: `AGRISENSE_FORCE_MOCK=true`
+## Demo Script (2-3 minutes)
 
-## System Prompt Behavior
-
-Sinai is configured to:
-
-- stay grounded in provided context
-- avoid hallucinating missing values
-- explain uncertainty honestly
-- provide practical actions for low-resource decision-making
-- prioritize resilience, preparedness, and food access
-
-## Fast Hackathon Demo Script (3 Minutes)
-
-1. Open Sinai chat UI and show `Local AI Running`.
-2. Ask: “What should we prioritize this week for safe food production?”
-3. Ask: “What risks should we watch if weather becomes unstable?”
-4. Ask: “Why is crop X not ideal right now?”
-5. Highlight that everything runs locally and is accessible from nearby phones without cloud dependency.
-
-## Where to Customize Quickly
-
-- LLM behavior/system rules: `app/local_web/services/prompting.py`
-- Context construction and top crops: `app/local_web/services/context_provider.py`
-- Ollama behavior/model selection: `app/local_web/services/ollama_client.py`
-- Chat UI and interaction: `app/local_web/static/index.html`, `app/local_web/static/styles.css`, `app/local_web/static/app.js`
+1. Open monitor on HDMI (`/monitor`).
+2. Connect two phones to `/client`, set different device names.
+3. Send prompts from both phones; monitor shows identity per prompt/reply.
+4. Switch monitor to Data Mode.
+5. Start Arduino bridge and show live metric changes.
+6. Emphasize that everything runs locally on one node.

@@ -13,6 +13,9 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-$USER}}"
 REPO_URL="${SINAI_REPO_URL:-https://github.com/yonathanwold/Sinai.git}"
 KIOSK_URL="${SINAI_KIOSK_URL:-http://127.0.0.1:8501}"
+ARDUINO_PORT="${ARDUINO_PORT:-}"
+ARDUINO_BAUD="${ARDUINO_BAUD:-9600}"
+ARDUINO_DEVICE_NAME="${ARDUINO_DEVICE_NAME:-Arduino}"
 
 log() {
   echo "[Sinai Web] $*"
@@ -98,7 +101,7 @@ cat > "/home/${SERVICE_USER}/.local/bin/sinai-kiosk.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-URL="${KIOSK_URL}"
+URL="${KIOSK_URL%/}/monitor"
 sleep 6
 
 for _ in \$(seq 1 120); do
@@ -134,15 +137,47 @@ EOF
 chmod +x "/home/${SERVICE_USER}/.local/bin/sinai-kiosk.sh"
 chown -R "${SERVICE_USER}:${SERVICE_USER}" "/home/${SERVICE_USER}/.local" "/home/${SERVICE_USER}/.config/autostart"
 
+if [ -n "${ARDUINO_PORT}" ]; then
+  log "Configuring Arduino serial bridge service on ${ARDUINO_PORT}..."
+  BRIDGE_TMP="$(mktemp)"
+  cat > "${BRIDGE_TMP}" <<EOF
+[Unit]
+Description=Sinai Arduino Serial Bridge
+After=network-online.target sinai-web.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${SINAI_DIR}
+ExecStart=${SINAI_DIR}/.venv/bin/python arduino/serial_to_sinai.py --port ${ARDUINO_PORT} --baud ${ARDUINO_BAUD} --server http://127.0.0.1:8501 --device-name "${ARDUINO_DEVICE_NAME}"
+Restart=always
+User=${SERVICE_USER}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  sudo cp "${BRIDGE_TMP}" /etc/systemd/system/sinai-arduino-bridge.service
+  rm -f "${BRIDGE_TMP}"
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now sinai-arduino-bridge
+else
+  log "Skipping Arduino bridge service (set ARDUINO_PORT to enable)."
+fi
+
 PI_IP="$(hostname -I | awk '{print $1}')"
 
 log "Completed."
 echo "Check status:"
 echo "  systemctl status ollama --no-pager"
 echo "  systemctl status sinai-web --no-pager"
+if [ -n "${ARDUINO_PORT}" ]; then
+  echo "  systemctl status sinai-arduino-bridge --no-pager"
+fi
 echo
 if [ -n "${PI_IP}" ]; then
-  echo "Open from nearby devices: http://${PI_IP}:8501"
+  echo "Monitor: http://${PI_IP}:8501/monitor"
+  echo "Phones:  http://${PI_IP}:8501/client"
 else
-  echo "Open from nearby devices: http://<pi-ip>:8501"
+  echo "Monitor: http://<pi-ip>:8501/monitor"
+  echo "Phones:  http://<pi-ip>:8501/client"
 fi

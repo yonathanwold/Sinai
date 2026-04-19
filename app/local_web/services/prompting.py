@@ -27,7 +27,7 @@ Response style:
   2) practical actions (now / next few days),
   3) key tradeoffs or risks to monitor.
 - Use short paragraphs or bullet points that field teams can execute quickly.
-- Default to concise outputs (about 120-180 words) unless the user asks for depth.
+- Default to concise outputs (about 70-120 words) unless the user asks for depth.
 """.strip()
 
 
