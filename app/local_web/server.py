@@ -22,7 +22,7 @@ from typing import Any, Literal
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 import uvicorn
@@ -736,6 +736,18 @@ def serve_monitor() -> FileResponse:
 @app.get("/client")
 def serve_client() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/generate_204", include_in_schema=False)
+@app.get("/gen_204", include_in_schema=False)
+@app.get("/hotspot-detect.html", include_in_schema=False)
+@app.get("/library/test/success.html", include_in_schema=False)
+@app.get("/success.txt", include_in_schema=False)
+@app.get("/ncsi.txt", include_in_schema=False)
+@app.get("/connecttest.txt", include_in_schema=False)
+@app.get("/redirect", include_in_schema=False)
+def captive_portal_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/client", status_code=302)
 
 
 @app.get("/static/{file_path:path}")
