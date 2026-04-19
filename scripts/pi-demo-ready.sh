@@ -170,6 +170,96 @@ EOF
   fi
 }
 
+configure_arduino_bridge() {
+  log "Configuring Arduino USB bridge service."
+
+  cat >/usr/local/sbin/sinai-arduino-bridge.sh <<EOF
+#!/usr/bin/env bash
+set -uo pipefail
+
+BOOT_DIR="/boot/firmware"
+if [ ! -d "\${BOOT_DIR}" ]; then
+  BOOT_DIR="/boot"
+fi
+LOG_FILE="\${BOOT_DIR}/sinai-arduino-bridge.log"
+APP_DIR="${TARGET_DIR}"
+BRIDGE="\${APP_DIR}/arduino/serial_to_sinai.py"
+SERVER_URL="\${SINAI_ARDUINO_SERVER:-http://127.0.0.1}"
+BAUD_RATE="\${SINAI_ARDUINO_BAUD:-9600}"
+DEVICE_NAME="\${SINAI_ARDUINO_DEVICE_NAME:-Arduino Sensor Hub}"
+SITE_NAME="\${SINAI_SITE_NAME:-Sinai Local Node A-17}"
+
+exec >> "\${LOG_FILE}" 2>&1
+
+log() {
+  echo "[Sinai Arduino] \$(date -Is) \$*"
+}
+
+pick_port() {
+  for candidate in /dev/ttyACM0 /dev/ttyACM1 /dev/ttyUSB0 /dev/ttyUSB1; do
+    if [ -e "\${candidate}" ]; then
+      printf '%s' "\${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [ ! -x "\${APP_DIR}/.venv/bin/python" ]; then
+  log "Python virtualenv is missing at \${APP_DIR}/.venv/bin/python."
+  exit 1
+fi
+
+if [ ! -f "\${BRIDGE}" ]; then
+  log "Bridge script not found at \${BRIDGE}."
+  exit 1
+fi
+
+while true; do
+  if ! port="\$(pick_port)"; then
+    log "Waiting for Arduino serial device (/dev/ttyACM* or /dev/ttyUSB*)."
+    sleep 3
+    continue
+  fi
+
+  log "Starting bridge on \${port} -> \${SERVER_URL}/api/data/ingest."
+  "\${APP_DIR}/.venv/bin/python" "\${BRIDGE}" \
+    --port "\${port}" \
+    --baud "\${BAUD_RATE}" \
+    --server "\${SERVER_URL}" \
+    --source "arduino-serial" \
+    --device-name "\${DEVICE_NAME}" \
+    --site-name "\${SITE_NAME}"
+
+  log "Bridge stopped; retrying in 2s."
+  sleep 2
+done
+EOF
+
+  chmod +x /usr/local/sbin/sinai-arduino-bridge.sh
+
+  cat >/etc/systemd/system/sinai-arduino-bridge.service <<'EOF'
+[Unit]
+Description=Sinai Arduino USB Serial Bridge
+After=sinai-web.service
+Wants=sinai-web.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/sinai-arduino-bridge.sh
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable sinai-arduino-bridge
+  systemctl restart sinai-arduino-bridge || true
+}
+
 configure_hotspot() {
   log "Configuring self-contained WPA2 hotspot using hostapd and dnsmasq."
 
@@ -364,6 +454,7 @@ main() {
   cleanup_cmdline
   configure_autologin_and_kiosk
   configure_web_service
+  configure_arduino_bridge
   verify_ollama || true
   configure_hotspot
   systemctl daemon-reload

@@ -22,8 +22,9 @@ log() {
 
 stop_old_stack() {
   log "Stopping conflicting services."
-  systemctl stop sinai-hotspot sinai-web nginx apache2 caddy lighttpd NetworkManager wpa_supplicant dhcpcd dnsmasq hostapd >/dev/null 2>&1 || true
+  systemctl stop sinai-hotspot sinai-web sinai-arduino-bridge nginx apache2 caddy lighttpd NetworkManager wpa_supplicant dhcpcd dnsmasq hostapd >/dev/null 2>&1 || true
   pkill -f 'uvicorn app.local_web.server:app' >/dev/null 2>&1 || true
+  pkill -f 'arduino/serial_to_sinai.py' >/dev/null 2>&1 || true
   pkill -x hostapd >/dev/null 2>&1 || true
   pkill -x dnsmasq >/dev/null 2>&1 || true
   rm -f /run/sinai-hostapd.pid /run/sinai-dnsmasq.pid /var/lib/misc/sinai-dnsmasq.leases
@@ -121,6 +122,40 @@ start_app() {
   exit 1
 }
 
+start_arduino_bridge() {
+  local bridge="${APP_DIR}/arduino/serial_to_sinai.py"
+  local python_bin="${APP_DIR}/.venv/bin/python"
+  local baud_rate="${SINAI_ARDUINO_BAUD:-9600}"
+  local device_name="${SINAI_ARDUINO_DEVICE_NAME:-Arduino Sensor Hub}"
+  local site_name="${SINAI_SITE_NAME:-Sinai Local Node A-17}"
+  local port=""
+
+  for candidate in /dev/ttyACM0 /dev/ttyACM1 /dev/ttyUSB0 /dev/ttyUSB1; do
+    if [ -e "${candidate}" ]; then
+      port="${candidate}"
+      break
+    fi
+  done
+
+  if [ -z "${port}" ]; then
+    log "Arduino serial port not detected; graphs will stay on fallback until USB sensor is plugged in."
+    return 0
+  fi
+  if [ ! -x "${python_bin}" ] || [ ! -f "${bridge}" ]; then
+    log "Arduino bridge prerequisites missing; skipping bridge start."
+    return 0
+  fi
+
+  log "Starting Arduino bridge on ${port}."
+  nohup "${python_bin}" "${bridge}" \
+    --port "${port}" \
+    --baud "${baud_rate}" \
+    --server "http://127.0.0.1" \
+    --source "arduino-serial" \
+    --device-name "${device_name}" \
+    --site-name "${site_name}" >>"${LOG_FILE}" 2>&1 &
+}
+
 open_monitor() {
   if command -v sudo >/dev/null 2>&1; then
     sudo -u pi DISPLAY=:0 XAUTHORITY=/home/pi/.Xauthority nohup chromium-browser \
@@ -137,6 +172,7 @@ main() {
   configure_wifi
   start_network
   start_app
+  start_arduino_bridge
   open_monitor
   log "READY: Wi-Fi=${SSID} password=${PASSWORD} phone=http://${AP_IP}/client monitor=http://${AP_IP}/monitor"
 }
