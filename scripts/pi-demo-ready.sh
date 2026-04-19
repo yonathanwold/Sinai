@@ -198,6 +198,7 @@ stop_existing_network_managers() {
   pkill -x hostapd >/dev/null 2>&1 || true
   pkill -x dnsmasq >/dev/null 2>&1 || true
   rm -f /run/sinai-hostapd.pid /run/sinai-dnsmasq.pid
+  rm -f /var/lib/misc/sinai-dnsmasq.leases
 }
 
 apply_port_redirect() {
@@ -286,19 +287,19 @@ if ! /usr/sbin/hostapd -B -P /run/sinai-hostapd.pid /etc/hostapd/hostapd.conf; t
   exit 1
 fi
 
-if ! /usr/sbin/dnsmasq --conf-file=/etc/sinai/dnsmasq-hotspot.conf --pid-file=/run/sinai-dnsmasq.pid --dhcp-leasefile=/var/lib/misc/sinai-dnsmasq.leases; then
-  log "dnsmasq failed to start."
-  cat /etc/sinai/dnsmasq-hotspot.conf || true
-  exit 1
-fi
-
-sleep 3
 apply_port_redirect
 pgrep -F /run/sinai-hostapd.pid >/dev/null
-pgrep -F /run/sinai-dnsmasq.pid >/dev/null
 ip addr show "\${IFACE}" || true
 iw dev "\${IFACE}" info || true
 log "Ready. SSID=\${SSID} PASSWORD=\${PASSWORD:-none} URL=http://\${AP_IP}/client"
+
+cleanup() {
+  log "Stopping hotspot."
+  kill "\$(cat /run/sinai-hostapd.pid 2>/dev/null)" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+exec /usr/sbin/dnsmasq --no-daemon --conf-file=/etc/sinai/dnsmasq-hotspot.conf --pid-file=/run/sinai-dnsmasq.pid --dhcp-leasefile=/var/lib/misc/sinai-dnsmasq.leases
 EOF
 
   chmod +x /usr/local/sbin/sinai-hotspot-start.sh
@@ -310,13 +311,13 @@ After=multi-user.target sinai-web.service
 Wants=sinai-web.service
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=simple
 ExecStartPre=/bin/sleep 8
 ExecStart=/usr/local/sbin/sinai-hotspot-start.sh
-Restart=on-failure
+Restart=always
 RestartSec=8
 StartLimitIntervalSec=0
+KillMode=control-group
 
 [Install]
 WantedBy=multi-user.target
