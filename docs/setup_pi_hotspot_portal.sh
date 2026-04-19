@@ -7,21 +7,29 @@ set -euo pipefail
 #   sudo bash docs/setup_pi_hotspot_portal.sh [ssid] [passphrase] [ap_ip]
 #
 # Example:
-#   sudo bash docs/setup_pi_hotspot_portal.sh Sinai-Node SinaiDemo2026 192.168.50.1
+#   sudo bash docs/setup_pi_hotspot_portal.sh Sinai-AI-Test OPEN 192.168.50.1
 
-SSID="${1:-Sinai-Node}"
-PASSPHRASE="${2:-SinaiDemo2026}"
+SSID="${1:-Sinai-AI-Test}"
+PASSPHRASE="${2:-OPEN}"
 AP_IP="${3:-192.168.50.1}"
 WLAN_IFACE="${WLAN_IFACE:-wlan0}"
 COUNTRY_CODE="${COUNTRY_CODE:-US}"
 PROFILE_NAME="${PROFILE_NAME:-sinai-hotspot}"
+OPEN_NETWORK=false
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root: sudo bash $0 [ssid] [passphrase] [ap_ip]"
   exit 1
 fi
 
-if [[ "${#PASSPHRASE}" -lt 8 ]]; then
+case "$(echo "${PASSPHRASE}" | tr '[:upper:]' '[:lower:]')" in
+  "" | "open" | "none" | "nopass" | "no-password")
+    OPEN_NETWORK=true
+    PASSPHRASE=""
+    ;;
+esac
+
+if [[ "${OPEN_NETWORK}" != "true" && "${#PASSPHRASE}" -lt 8 ]]; then
   echo "Passphrase must be at least 8 characters."
   exit 1
 fi
@@ -96,11 +104,20 @@ wmm_enabled=0
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
+EOF
+
+  if [[ "${OPEN_NETWORK}" == "true" ]]; then
+    cat >> /etc/hostapd/hostapd.conf <<EOF
+# Open network mode for demo access.
+EOF
+  else
+    cat >> /etc/hostapd/hostapd.conf <<EOF
 wpa=2
 wpa_passphrase=${PASSPHRASE}
 wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
 EOF
+  fi
 
   if grep -q '^DAEMON_CONF=' /etc/default/hostapd; then
     sed -i 's|^DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
@@ -159,11 +176,18 @@ EOF
   nmcli connection modify "${PROFILE_NAME}" \
     802-11-wireless.mode ap \
     802-11-wireless.band bg \
-    802-11-wireless-security.key-mgmt wpa-psk \
-    802-11-wireless-security.psk "${PASSPHRASE}" \
     ipv4.method shared \
     ipv4.addresses "${AP_IP}/24" \
     ipv6.method ignore
+
+  if [[ "${OPEN_NETWORK}" == "true" ]]; then
+    nmcli connection modify "${PROFILE_NAME}" \
+      802-11-wireless-security.key-mgmt none
+  else
+    nmcli connection modify "${PROFILE_NAME}" \
+      802-11-wireless-security.key-mgmt wpa-psk \
+      802-11-wireless-security.psk "${PASSPHRASE}"
+  fi
 
   configure_nginx_redirect
 
@@ -182,6 +206,10 @@ fi
 
 log "Completed."
 echo "SSID: ${SSID}"
-echo "Passphrase: ${PASSPHRASE}"
+if [[ "${OPEN_NETWORK}" == "true" ]]; then
+  echo "Security: Open network (no password)"
+else
+  echo "Passphrase: ${PASSPHRASE}"
+fi
 echo "Open Sinai on phones: ${SINAI_URL}"
 echo "If captive portal does not auto-open, browse manually to: ${SINAI_URL}"

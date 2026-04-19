@@ -82,7 +82,7 @@ This demonstrates true offline operation even when external internet is unavaila
 One-command hotspot + captive redirect setup:
 
 ```bash
-sudo bash docs/setup_pi_hotspot_portal.sh Sinai-Node SinaiDemo2026 192.168.50.1
+sudo bash docs/setup_pi_hotspot_portal.sh Sinai-AI-Test OPEN 192.168.50.1
 ```
 
 After phones join the Pi SSID, most devices auto-open a captive portal window that redirects to:
@@ -93,6 +93,8 @@ Phone:   http://192.168.50.1:8501/client
 ```
 
 If captive portal auto-open does not trigger, users can browse to that URL directly.
+
+`OPEN` sets no Wi-Fi password for quick live demos.
 
 ## 5. Safety model (recommended)
 

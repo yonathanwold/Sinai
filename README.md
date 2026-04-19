@@ -228,7 +228,7 @@ systemctl status ollama --no-pager
 ## Pi hotspot for local-only phone demo
 
 ```bash
-sudo bash docs/setup_pi_hotspot_portal.sh Sinai-Node SinaiDemo2026 192.168.50.1
+sudo bash docs/setup_pi_hotspot_portal.sh Sinai-AI-Test OPEN 192.168.50.1
 ```
 
 Then phones join Pi Wi-Fi and open:
@@ -236,6 +236,8 @@ Then phones join Pi Wi-Fi and open:
 
 Use monitor/HDMI:
 - `http://127.0.0.1:8501/monitor`
+
+`OPEN` means no password. If you want a password later, pass one as the second argument.
 
 ---
 
