@@ -11,6 +11,7 @@ PROGRESS_FILE="${BOOT_DIR}/sinai-ollama-progress.json"
 TARGET_DIR="/home/pi/Sinai"
 MODEL_NAME="${SINAI_OLLAMA_MODEL:-llama3.2:1b}"
 HOTSPOT_SSID="${SINAI_HOTSPOT_SSID:-Sinai-AI-Test}"
+HOTSPOT_PASSWORD="${SINAI_HOTSPOT_PASSWORD:-12345678}"
 HOTSPOT_IP="${SINAI_HOTSPOT_IP:-192.168.50.1}"
 HOTSPOT_IFACE="${SINAI_HOTSPOT_IFACE:-wlan0}"
 HOTSPOT_CHANNEL="${SINAI_HOTSPOT_CHANNEL:-6}"
@@ -167,7 +168,7 @@ EOF
 }
 
 configure_hotspot() {
-  log "Configuring fast open hotspot using hostapd and dnsmasq."
+  log "Configuring reliable WPA2 hotspot using hostapd and dnsmasq."
 
   cat >/usr/local/sbin/sinai-hotspot-start.sh <<EOF
 #!/usr/bin/env bash
@@ -181,6 +182,7 @@ LOG_FILE="\${BOOT_DIR}/sinai-hotspot.log"
 exec >> "\${LOG_FILE}" 2>&1
 
 SSID="\${SINAI_HOTSPOT_SSID:-${HOTSPOT_SSID}}"
+PASSWORD="\${SINAI_HOTSPOT_PASSWORD:-${HOTSPOT_PASSWORD}}"
 AP_IP="\${SINAI_HOTSPOT_IP:-${HOTSPOT_IP}}"
 IFACE="\${SINAI_HOTSPOT_IFACE:-${HOTSPOT_IFACE}}"
 CHANNEL="\${SINAI_HOTSPOT_CHANNEL:-${HOTSPOT_CHANNEL}}"
@@ -208,7 +210,7 @@ wait_for_wifi() {
   return 1
 }
 
-log "Starting open hotspot."
+log "Starting WPA2 hotspot."
 rfkill unblock all >/dev/null 2>&1 || true
 wait_for_wifi || exit 1
 
@@ -233,6 +235,15 @@ auth_algs=1
 ignore_broadcast_ssid=0
 HEOF
 
+if [ -n "\${PASSWORD}" ]; then
+  cat >>/etc/hostapd/hostapd.conf <<HEOF
+wpa=2
+wpa_passphrase=\${PASSWORD}
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+HEOF
+fi
+
 mkdir -p /etc/dnsmasq.d
 cat >/etc/dnsmasq.d/sinai-hotspot.conf <<DEOF
 interface=\${IFACE}
@@ -255,14 +266,15 @@ systemctl restart hostapd dnsmasq
 sleep 2
 apply_port_redirect
 systemctl is-active --quiet hostapd && systemctl is-active --quiet dnsmasq
-log "Ready. SSID=\${SSID} URL=http://\${AP_IP}/client"
+ip addr show "\${IFACE}" || true
+log "Ready. SSID=\${SSID} PASSWORD=\${PASSWORD:-none} URL=http://\${AP_IP}/client"
 EOF
 
   chmod +x /usr/local/sbin/sinai-hotspot-start.sh
 
   cat >/etc/systemd/system/sinai-hotspot.service <<'EOF'
 [Unit]
-Description=Sinai Open Phone Hotspot
+Description=Sinai Phone Hotspot
 After=multi-user.target sinai-web.service
 Wants=sinai-web.service
 
