@@ -92,8 +92,10 @@ const state = {
   clientBusy: false,
   queue: {
     queued: 0,
+    waiting: 0,
     processing: false,
     pending_total: 0,
+    active: null,
     items: [],
     next_question: null,
     next_device_name: null,
@@ -309,6 +311,7 @@ function renderDeviceList() {
 
 function renderQueueStatus() {
   const queue = state.queue || {};
+  const active = queue.active || null;
   const items = queue.items || [];
   const pending = Number(queue.pending_total || 0);
   const queued = Number(queue.queued || 0);
@@ -316,21 +319,40 @@ function renderQueueStatus() {
   const nextDevice = queue.next_device_name || "";
 
   if (queueCount) {
-    queueCount.textContent = `${queued} waiting`;
+    queueCount.textContent = `${pending} total`;
   }
   if (queueNext) {
-    queueNext.textContent = nextQuestion
-      ? `Next: ${nextDevice || "Device"} - ${nextQuestion}`
-      : pending > 0
-        ? "One prompt is processing."
-        : "No queued prompts.";
+    if (active) {
+      queueNext.textContent = `Now answering: ${active.device_name || "Device"} - ${active.question || ""}`;
+    } else if (nextQuestion) {
+      queueNext.textContent = `Next: ${nextDevice || "Device"} - ${nextQuestion}`;
+    } else {
+      queueNext.textContent = "No queued prompts.";
+    }
   }
   if (queueList) {
     queueList.innerHTML = "";
+    if (active) {
+      const li = document.createElement("li");
+      li.className = "queue-row active";
+      li.innerHTML = `
+        <div class="queue-pos">#1</div>
+        <div class="queue-text">
+          <div class="queue-device">${active.device_name || "Device"} <span class="queue-live-pill">LIVE</span></div>
+          <div class="queue-question"></div>
+        </div>
+      `;
+      const q = li.querySelector(".queue-question");
+      if (q) {
+        q.textContent = active.question || "";
+      }
+      queueList.appendChild(li);
+    }
+
     if (items.length === 0) {
       const li = document.createElement("li");
       li.className = "queue-row empty";
-      li.textContent = pending > 0 ? "Processing current prompt..." : "Queue is empty.";
+      li.textContent = active ? "No one waiting behind current prompt." : "Queue is empty.";
       queueList.appendChild(li);
     } else {
       items.forEach((item) => {
@@ -354,10 +376,16 @@ function renderQueueStatus() {
 
   if (clientQueueStatus) {
     const mySessionId = state.sessionId || "";
-    const myIndex = items.findIndex((item) => item.session_id === mySessionId);
-    if (myIndex >= 0) {
-      clientQueueStatus.textContent = `You are #${myIndex + 1} in queue.`;
-    } else if (state.clientBusy && pending > 0) {
+    if (active && active.session_id === mySessionId) {
+      clientQueueStatus.textContent = "Your prompt is being processed...";
+      return;
+    }
+    const mine = items.find((item) => item.session_id === mySessionId);
+    if (mine) {
+      clientQueueStatus.textContent = `You are #${mine.position} in queue.`;
+      return;
+    }
+    if (state.clientBusy && pending > 0) {
       clientQueueStatus.textContent = "Your prompt is being processed...";
     } else if (pending > 0) {
       clientQueueStatus.textContent = `${queued} waiting. Next: ${nextDevice || "Device"}`;

@@ -31,9 +31,11 @@ class OllamaClient:
             or os.getenv("OLLAMA_MODEL")
             or "llama3.2:1b"
         )
-        self.request_timeout_seconds = int(os.getenv("SINAI_OLLAMA_TIMEOUT", "240"))
-        self.max_tokens = int(os.getenv("SINAI_OLLAMA_MAX_TOKENS", "96"))
-        self.context_window = int(os.getenv("SINAI_OLLAMA_CONTEXT_WINDOW", "2048"))
+        self.request_timeout_seconds = int(os.getenv("SINAI_OLLAMA_TIMEOUT", "18"))
+        self.max_tokens = int(os.getenv("SINAI_OLLAMA_MAX_TOKENS", "80"))
+        self.context_window = int(os.getenv("SINAI_OLLAMA_CONTEXT_WINDOW", "1536"))
+        default_threads = max(2, (os.cpu_count() or 4) - 1)
+        self.num_threads = int(os.getenv("SINAI_OLLAMA_NUM_THREADS", str(default_threads)))
         self.keep_alive = os.getenv("SINAI_OLLAMA_KEEP_ALIVE", "20m")
         self.tags_cache_ttl_seconds = int(os.getenv("SINAI_OLLAMA_TAGS_CACHE_TTL", "30"))
         self._cached_models: list[str] = []
@@ -79,6 +81,7 @@ class OllamaClient:
                 "temperature": 0.2,
                 "num_predict": self.max_tokens,
                 "num_ctx": self.context_window,
+                "num_thread": self.num_threads,
             },
         }
         body = json.dumps(payload).encode("utf-8")

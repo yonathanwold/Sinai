@@ -27,14 +27,14 @@ Response style:
   2) practical actions (now / next few days),
   3) key tradeoffs or risks to monitor.
 - Use short paragraphs or bullet points that field teams can execute quickly.
-- Default to concise outputs (about 45-90 words) unless the user asks for depth.
+- Default to concise outputs (about 35-70 words) unless the user asks for depth.
 """.strip()
 
 
 def _compact_context(context: dict[str, object]) -> dict[str, object]:
     top_crops = context.get("top_crops", [])
     compact_top = []
-    for crop in top_crops[:2]:
+    for crop in top_crops[:1]:
         compact_top.append(
             {
                 "name": crop.get("name"),
@@ -52,8 +52,8 @@ def _compact_context(context: dict[str, object]) -> dict[str, object]:
         "labels": context.get("labels", {}),
         "readings": context.get("readings", {}),
         "top_crops": compact_top,
-        "risk_flags": list(context.get("risk_flags", []))[:3],
-        "warnings": list(context.get("warnings", []))[:2],
+        "risk_flags": list(context.get("risk_flags", []))[:1],
+        "warnings": list(context.get("warnings", []))[:1],
     }
 
 
@@ -77,7 +77,7 @@ def build_messages(
     ]
 
     # Keep recent turns to preserve short-session continuity.
-    for turn in history[-2:]:
+    for turn in history[-1:]:
         role = turn.get("role", "")
         content = turn.get("content", "").strip()
         if role in {"user", "assistant"} and content:

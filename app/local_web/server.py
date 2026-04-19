@@ -501,12 +501,15 @@ class PromptQueueProcessor:
         self._queue: asyncio.Queue[PromptQueueJob] = asyncio.Queue()
         self._worker_task: asyncio.Task | None = None
         self._processing = False
+        self._active_job: dict[str, object] | None = None
 
     def snapshot(self) -> dict[str, object]:
         queued = self._queue.qsize()
         processing = self._processing
+        active = self._active_job if processing else None
         preview: list[dict[str, object]] = []
-        for idx, queued_job in enumerate(list(self._queue._queue)[:8], start=1):  # noqa: SLF001
+        start_position = 2 if active else 1
+        for idx, queued_job in enumerate(list(self._queue._queue)[:8], start=start_position):  # noqa: SLF001
             preview.append(
                 {
                     "position": idx,
@@ -518,11 +521,21 @@ class PromptQueueProcessor:
             )
         return {
             "queued": queued,
+            "waiting": queued,
             "processing": processing,
             "pending_total": queued + (1 if processing else 0),
+            "active": active,
             "items": preview,
-            "next_question": preview[0]["question"] if preview else None,
-            "next_device_name": preview[0]["device_name"] if preview else None,
+            "next_question": (
+                str(active.get("question", ""))
+                if active
+                else (preview[0]["question"] if preview else None)
+            ),
+            "next_device_name": (
+                str(active.get("device_name", ""))
+                if active
+                else (preview[0]["device_name"] if preview else None)
+            ),
         }
 
     async def start(self) -> None:
@@ -546,6 +559,13 @@ class PromptQueueProcessor:
         while True:
             job = await self._queue.get()
             self._processing = True
+            self._active_job = {
+                "position": 1,
+                "session_id": job.session_id,
+                "device_name": job.device_name,
+                "question": job.question[:180],
+                "enqueued_at_utc": job.enqueued_at_utc,
+            }
             try:
                 await _broadcast_queue_status()
                 result = await _process_chat_job(job)
@@ -556,6 +576,7 @@ class PromptQueueProcessor:
                     job.future.set_exception(exc)
             finally:
                 self._processing = False
+                self._active_job = None
                 self._queue.task_done()
                 await _broadcast_queue_status()
 
@@ -672,7 +693,15 @@ async def _process_chat_job(job: PromptQueueJob) -> dict[str, object]:
         "reply": answer,
         "source": source,
         "model": model_name,
-        "context": context,
+        "context": {
+            "site_name": context.get("site_name"),
+            "region": context.get("region"),
+            "source": context.get("source"),
+            "timestamp_utc": context.get("timestamp_utc"),
+            "summary": context.get("summary"),
+            "labels": context.get("labels", {}),
+            "readings": context.get("readings", {}),
+        },
         "history": session_store.history(job.session_id),
     }
 
@@ -925,6 +954,7 @@ async def websocket_realtime(websocket: WebSocket) -> None:
                         "devices": session_store.devices_snapshot(),
                         "feed": session_store.live_feed(limit=40),
                         "data": await sensor_feed.payload(),
+                        "queue": prompt_queue.snapshot(),
                     }
                 )
     except WebSocketDisconnect:
