@@ -181,7 +181,7 @@ class LocalAIAdvisorService:
             "Local AI fallback guidance:",
             (
                 f"Current profile: temperature {labels['temperature']}, light {labels['light']}, "
-                f"UV {labels['uv']}, air quality {labels['air_quality']}."
+                f"air quality {labels['air_quality']}."
             ),
             "",
         ]

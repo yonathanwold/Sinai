@@ -31,7 +31,7 @@ class OllamaClient:
             or os.getenv("OLLAMA_MODEL")
             or "llama3.2:1b"
         )
-        self.request_timeout_seconds = int(os.getenv("SINAI_OLLAMA_TIMEOUT", "18"))
+        self.request_timeout_seconds = int(os.getenv("SINAI_OLLAMA_TIMEOUT", "60"))
         self.max_tokens = int(os.getenv("SINAI_OLLAMA_MAX_TOKENS", "80"))
         self.context_window = int(os.getenv("SINAI_OLLAMA_CONTEXT_WINDOW", "1536"))
         default_threads = max(2, (os.cpu_count() or 4) - 1)

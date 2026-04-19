@@ -115,7 +115,7 @@ class AIRecommendationService:
         overview = (
             "The current site profile favors crops that can tolerate "
             f"{labels['temperature']} temperatures, {labels['light']} light, "
-            f"{labels['uv']} UV exposure, and {labels['air_quality']} air quality. "
+            f"and {labels['air_quality']} air quality. "
             "The ranking prioritizes fast harvest cycles and resilience for local food continuity."
         )
 

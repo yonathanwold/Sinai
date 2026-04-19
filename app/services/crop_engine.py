@@ -61,14 +61,6 @@ class CropScoringEngine:
             cautions,
         )
         score += self._match_component(
-            environment.uv_label,
-            crop.preferred_uv_levels,
-            10,
-            "UV",
-            reasons,
-            cautions,
-        )
-        score += self._match_component(
             environment.air_quality_label,
             crop.air_tolerance,
             10,

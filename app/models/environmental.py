@@ -36,7 +36,7 @@ class SensorSnapshot:
             else fallback.temperature_c,
             pressure_hpa=self.pressure_hpa if self.pressure_hpa is not None else fallback.pressure_hpa,
             pressure_history_hpa=self.pressure_history_hpa or fallback.pressure_history_hpa,
-            uv_index=self.uv_index if self.uv_index is not None else fallback.uv_index,
+            uv_index=self.uv_index,
             air_quality_eco2_ppm=self.air_quality_eco2_ppm
             if self.air_quality_eco2_ppm is not None
             else fallback.air_quality_eco2_ppm,
@@ -86,7 +86,6 @@ class ClassifiedEnvironment:
         return {
             "temperature": self.temperature_label,
             "light": self.light_label,
-            "uv": self.uv_label,
             "air_quality": self.air_quality_label,
             "pressure_trend": self.pressure_trend,
         }

@@ -59,7 +59,6 @@ class ContextProvider:
             "readings": {
                 "temperature_c": snapshot.temperature_c,
                 "pressure_hpa": snapshot.pressure_hpa,
-                "uv_index": snapshot.uv_index,
                 "light_lux": snapshot.light_lux,
                 "air_quality_eco2_ppm": snapshot.air_quality_eco2_ppm,
                 "air_quality_tvoc_ppb": snapshot.air_quality_tvoc_ppb,
@@ -75,13 +74,12 @@ class ContextProvider:
     @staticmethod
     def _summary(snapshot, labels: dict[str, str]) -> str:
         return (
-            f"Conditions are {labels['temperature']} with {labels['light']} light and "
-            f"{labels['uv']} UV. Air quality is {labels['air_quality']} and pressure trend is "
+            f"Conditions are {labels['temperature']} with {labels['light']} light. "
+            f"Air quality is {labels['air_quality']} and pressure trend is "
             f"{labels['pressure_trend']}. "
             f"Current readings: {fmt_number(snapshot.temperature_c, ' C')}, "
             f"{fmt_number(snapshot.pressure_hpa, ' hPa', 1)}, "
             f"{fmt_number(snapshot.light_lux, ' lux', 0)} light, "
-            f"UV {fmt_number(snapshot.uv_index, '', 1)}, "
             f"eCO2 {fmt_number(snapshot.air_quality_eco2_ppm, ' ppm', 0)}."
         )
 
@@ -94,9 +92,6 @@ class ContextProvider:
             risk_flags.append("Falling pressure may indicate unstable weather conditions.")
         if labels["air_quality"] == "poor":
             risk_flags.append("Poor air quality may reduce growth quality for sensitive crops.")
-        if labels["uv"] == "high":
-            risk_flags.append("High UV exposure can stress young plants without shade planning.")
         if not risk_flags:
             risk_flags.append("No high-severity alert. Continue daily monitoring for rapid changes.")
         return risk_flags
-

@@ -37,7 +37,6 @@ from app.services.normalization import (
     classify_light,
     classify_pressure_trend,
     classify_temperature,
-    classify_uv,
 )
 
 
@@ -128,7 +127,6 @@ def _labels_for_readings(
     return {
         "temperature": classify_temperature(readings.get("temperature_c")),
         "light": classify_light(readings.get("light_lux")),
-        "uv": classify_uv(readings.get("uv_index")),
         "air_quality": classify_air_quality(
             int(readings["air_quality_eco2_ppm"])
             if readings.get("air_quality_eco2_ppm") is not None
@@ -250,7 +248,6 @@ class SensorFeedState:
             "humidity_percent": None,
             "soil_moisture_pct": None,
             "pressure_hpa": _coerce_float(snapshot.pressure_hpa),
-            "uv_index": _coerce_float(snapshot.uv_index),
             "light_lux": _coerce_float(snapshot.light_lux),
             "air_quality_eco2_ppm": _coerce_float(snapshot.air_quality_eco2_ppm),
             "air_quality_tvoc_ppb": _coerce_float(snapshot.air_quality_tvoc_ppb),
@@ -299,8 +296,6 @@ class SensorFeedState:
             parts.append(f"H {readings['humidity_percent']:.0f}%")
         if readings.get("soil_moisture_pct") is not None:
             parts.append(f"Soil {readings['soil_moisture_pct']:.0f}%")
-        if readings.get("uv_index") is not None:
-            parts.append(f"UV {readings['uv_index']:.1f}")
         if readings.get("light_lux") is not None:
             parts.append(f"Light {readings['light_lux']:.0f} lx")
         return " | ".join(parts) if parts else "No sensor values available"
@@ -407,7 +402,6 @@ class SensorFeedState:
             "humidity_percent": [item.get("readings", {}).get("humidity_percent") for item in history],
             "soil_moisture_pct": [item.get("readings", {}).get("soil_moisture_pct") for item in history],
             "pressure_hpa": [item.get("readings", {}).get("pressure_hpa") for item in history],
-            "uv_index": [item.get("readings", {}).get("uv_index") for item in history],
             "light_lux": [item.get("readings", {}).get("light_lux") for item in history],
             "air_quality_eco2_ppm": [
                 item.get("readings", {}).get("air_quality_eco2_ppm") for item in history
@@ -432,7 +426,6 @@ SENSOR_READING_KEYS = {
     "humidity_percent",
     "soil_moisture_pct",
     "pressure_hpa",
-    "uv_index",
     "light_lux",
     "air_quality_eco2_ppm",
     "air_quality_tvoc_ppb",
@@ -443,7 +436,6 @@ SENSOR_KEY_ALIASES: dict[str, tuple[str, ...]] = {
     "humidity_percent": ("humidity_percent", "humidity", "humidity_pct", "h"),
     "soil_moisture_pct": ("soil_moisture_pct", "soil_moisture", "soil", "soil_pct"),
     "pressure_hpa": ("pressure_hpa", "pressure", "pressure_mb"),
-    "uv_index": ("uv_index", "uv", "uvi"),
     "light_lux": ("light_lux", "light", "lux"),
     "air_quality_eco2_ppm": ("air_quality_eco2_ppm", "eco2", "co2", "co2_ppm"),
     "air_quality_tvoc_ppb": ("air_quality_tvoc_ppb", "tvoc", "tvoc_ppb"),

@@ -1147,7 +1147,7 @@ def render_dashboard_tab(
         '<div class="section-kicker reveal" style="animation-delay:210ms;">Operational Environment Snapshot</div>',
         unsafe_allow_html=True,
     )
-    metric_cols = st.columns(5)
+    metric_cols = st.columns(4)
     with metric_cols[0]:
         render_condition_card(
             "Temperature",
@@ -1166,21 +1166,13 @@ def render_dashboard_tab(
         )
     with metric_cols[2]:
         render_condition_card(
-            "UV",
-            environment.uv_label.title(),
-            f"Current: {fmt_number(snapshot.uv_index, '', 1)}",
-            "Bands: low <3, medium 3-5.9, high 6+",
-            330,
-        )
-    with metric_cols[3]:
-        render_condition_card(
             "Air Quality",
             environment.air_quality_label.title(),
             f"Current eCO2: {fmt_number(snapshot.air_quality_eco2_ppm, ' ppm', 0)}",
             "Derived from eCO2 and TVOC tolerance bands",
             370,
         )
-    with metric_cols[4]:
+    with metric_cols[3]:
         render_condition_card(
             "Pressure Trend",
             environment.pressure_trend.title(),

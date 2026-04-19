@@ -48,7 +48,6 @@ def fallback_response(user_message: str, context: dict[str, object]) -> str:
             "Observed condition labels: "
             f"temperature={labels.get('temperature')}, "
             f"light={labels.get('light')}, "
-            f"uv={labels.get('uv')}, "
             f"air_quality={labels.get('air_quality')}, "
             f"pressure_trend={labels.get('pressure_trend')}."
         )

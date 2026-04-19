@@ -17,7 +17,6 @@ REGION_PROFILES: dict[str, dict[str, Any]] = {
     "Coastal Recovery Zone": {
         "temperature": (24.0, 33.0),
         "pressure": (1004.0, 1012.0),
-        "uv": (4.5, 8.5),
         "eco2": (450, 900),
         "tvoc": (60, 260),
         "light": (8_000, 42_000),
@@ -26,7 +25,6 @@ REGION_PROFILES: dict[str, dict[str, Any]] = {
     "Urban Relief Hub": {
         "temperature": (20.0, 29.0),
         "pressure": (1008.0, 1018.0),
-        "uv": (1.0, 5.0),
         "eco2": (650, 1_350),
         "tvoc": (120, 700),
         "light": (800, 12_000),
@@ -35,7 +33,6 @@ REGION_PROFILES: dict[str, dict[str, Any]] = {
     "Dry Inland Cooperative": {
         "temperature": (27.0, 38.0),
         "pressure": (1010.0, 1020.0),
-        "uv": (6.0, 10.0),
         "eco2": (430, 850),
         "tvoc": (40, 200),
         "light": (18_000, 60_000),
@@ -44,7 +41,6 @@ REGION_PROFILES: dict[str, dict[str, Any]] = {
     "Mountain Valley Site": {
         "temperature": (12.0, 23.0),
         "pressure": (990.0, 1004.0),
-        "uv": (2.0, 6.5),
         "eco2": (420, 760),
         "tvoc": (30, 180),
         "light": (4_000, 28_000),
@@ -69,7 +65,7 @@ class MockSensorProvider:
             temperature_c=round(random.uniform(*profile["temperature"]), 1),
             pressure_hpa=round(pressure, 1),
             pressure_history_hpa=history,
-            uv_index=round(random.uniform(*profile["uv"]), 1),
+            uv_index=None,
             air_quality_eco2_ppm=random.randint(*profile["eco2"]),
             air_quality_tvoc_ppb=random.randint(*profile["tvoc"]),
             light_lux=round(light_lux, 0),
@@ -103,7 +99,6 @@ class HardwareSensorProvider:
         warnings: list[str] = []
 
         temperature_c, pressure_hpa = self._read_spa06(warnings)
-        uv_index = self._read_veml6070(warnings)
         eco2_ppm, tvoc_ppb = self._read_ccs811(warnings)
         light_lux, light_raw = self._read_arduino_light(warnings)
 
@@ -113,7 +108,7 @@ class HardwareSensorProvider:
             temperature_c=temperature_c,
             pressure_hpa=pressure_hpa,
             pressure_history_hpa=pressure_history,
-            uv_index=uv_index,
+            uv_index=None,
             air_quality_eco2_ppm=eco2_ppm,
             air_quality_tvoc_ppb=tvoc_ppb,
             light_lux=light_lux,
@@ -138,27 +133,6 @@ class HardwareSensorProvider:
         except Exception as exc:  # Hardware buses fail loudly when sensors are absent.
             warnings.append(f"SPA06/SPL06 read failed: {exc}")
             return None, None
-
-    @staticmethod
-    def _read_veml6070(warnings: list[str]) -> float | None:
-        try:
-            import board  # type: ignore
-            import adafruit_veml6070  # type: ignore
-        except ImportError:
-            warnings.append("VEML6070 reader unavailable: install Adafruit CircuitPython libraries.")
-            return None
-
-        try:
-            i2c = board.I2C()
-            sensor = adafruit_veml6070.VEML6070(i2c)
-            raw_value = getattr(sensor, "uv_raw", None) or getattr(sensor, "uv", None)
-            if raw_value is None:
-                warnings.append("VEML6070 read returned no UV value.")
-                return None
-            return round(min(float(raw_value) / 230.0, 12.0), 1)
-        except Exception as exc:
-            warnings.append(f"VEML6070 read failed: {exc}")
-            return None
 
     @staticmethod
     def _read_ccs811(warnings: list[str]) -> tuple[int | None, int | None]:
@@ -298,7 +272,7 @@ class SensorIngestionService:
                 temperature_c=merged.temperature_c,
                 pressure_hpa=merged.pressure_hpa,
                 pressure_history_hpa=merged.pressure_history_hpa,
-                uv_index=merged.uv_index,
+                uv_index=None,
                 air_quality_eco2_ppm=merged.air_quality_eco2_ppm,
                 air_quality_tvoc_ppb=merged.air_quality_tvoc_ppb,
                 light_lux=merged.light_lux,
@@ -320,7 +294,6 @@ class SensorIngestionService:
             for value in [
                 snapshot.temperature_c,
                 snapshot.pressure_hpa,
-                snapshot.uv_index,
                 snapshot.air_quality_eco2_ppm,
                 snapshot.air_quality_tvoc_ppb,
                 snapshot.light_lux,
