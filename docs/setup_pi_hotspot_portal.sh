@@ -15,6 +15,7 @@ AP_IP="${3:-192.168.50.1}"
 WLAN_IFACE="${WLAN_IFACE:-wlan0}"
 COUNTRY_CODE="${COUNTRY_CODE:-US}"
 PROFILE_NAME="${PROFILE_NAME:-sinai-hotspot}"
+AP_CHANNEL="${AP_CHANNEL:-6}"
 OPEN_NETWORK=false
 
 if [[ "${EUID}" -ne 0 ]]; then
@@ -41,10 +42,11 @@ log() {
 AP_NET_PREFIX="$(echo "${AP_IP}" | awk -F. '{print $1"."$2"."$3}')"
 DHCP_START="${AP_NET_PREFIX}.20"
 DHCP_END="${AP_NET_PREFIX}.250"
-SINAI_URL="http://${AP_IP}:8501/"
+SINAI_URL="http://${AP_IP}/client"
+SINAI_BACKEND_URL="http://127.0.0.1:8501"
 
 configure_nginx_redirect() {
-  log "Configuring captive redirect on port 80..."
+  log "Configuring captive portal + reverse proxy on port 80..."
   apt-get install -y nginx
 
   cat > /etc/nginx/sites-available/sinai-captive <<EOF
@@ -56,10 +58,60 @@ server {
     location = /generate_204 {
         return 302 ${SINAI_URL};
     }
+    location = /gen_204 {
+        return 302 ${SINAI_URL};
+    }
     location = /hotspot-detect.html {
         return 302 ${SINAI_URL};
     }
+    location = /library/test/success.html {
+        return 302 ${SINAI_URL};
+    }
+    location = /success.txt {
+        return 302 ${SINAI_URL};
+    }
     location = /ncsi.txt {
+        return 302 ${SINAI_URL};
+    }
+    location = /connecttest.txt {
+        return 302 ${SINAI_URL};
+    }
+    location = /redirect {
+        return 302 ${SINAI_URL};
+    }
+    location ^~ /ws/ {
+        proxy_pass ${SINAI_BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+    }
+    location ^~ /api/ {
+        proxy_pass ${SINAI_BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_connect_timeout 2s;
+        proxy_read_timeout 60s;
+    }
+    location ^~ /static/ {
+        proxy_pass ${SINAI_BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        expires 5m;
+        add_header Cache-Control "public, max-age=300";
+    }
+    location = /client {
+        proxy_pass ${SINAI_BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+    location = /monitor {
+        proxy_pass ${SINAI_BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+    location = / {
         return 302 ${SINAI_URL};
     }
     location / {
@@ -99,8 +151,9 @@ country_code=${COUNTRY_CODE}
 interface=${WLAN_IFACE}
 ssid=${SSID}
 hw_mode=g
-channel=6
-wmm_enabled=0
+channel=${AP_CHANNEL}
+wmm_enabled=1
+ieee80211n=1
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
@@ -130,8 +183,13 @@ EOF
 interface=${WLAN_IFACE}
 bind-interfaces
 dhcp-range=${DHCP_START},${DHCP_END},255.255.255.0,24h
+dhcp-authoritative
+dhcp-option=option:router,${AP_IP}
+dhcp-option=option:dns-server,${AP_IP}
 domain-needed
 bogus-priv
+no-resolv
+cache-size=1000
 address=/#/${AP_IP}
 EOF
 
@@ -141,9 +199,11 @@ EOF
   rfkill unblock wlan || true
   if command -v nmcli >/dev/null 2>&1; then
     nmcli dev disconnect "${WLAN_IFACE}" >/dev/null 2>&1 || true
+    nmcli connection down "netplan-${WLAN_IFACE}-Yonathan’s iPhone" >/dev/null 2>&1 || true
+    nmcli connection down "netplan-${WLAN_IFACE}-Yonathan's iPhone" >/dev/null 2>&1 || true
   fi
-  systemctl stop NetworkManager || true
-  systemctl stop wpa_supplicant || true
+  systemctl disable --now NetworkManager || true
+  systemctl disable --now wpa_supplicant || true
   systemctl unmask hostapd || true
   if systemctl list-unit-files | grep -q '^dhcpcd\.service'; then
     systemctl restart dhcpcd
@@ -170,6 +230,11 @@ configure_with_nmcli() {
   mkdir -p /etc/NetworkManager/dnsmasq-shared.d
   cat > /etc/NetworkManager/dnsmasq-shared.d/sinai-hotspot.conf <<EOF
 address=/#/${AP_IP}
+dhcp-authoritative
+dhcp-option=option:router,${AP_IP}
+dhcp-option=option:dns-server,${AP_IP}
+no-resolv
+cache-size=1000
 EOF
 
   nmcli connection delete "${PROFILE_NAME}" >/dev/null 2>&1 || true
@@ -183,6 +248,7 @@ EOF
   nmcli connection modify "${PROFILE_NAME}" \
     802-11-wireless.mode ap \
     802-11-wireless.band bg \
+    802-11-wireless.channel "${AP_CHANNEL}" \
     ipv4.method shared \
     ipv4.addresses "${AP_IP}/24" \
     ipv6.method ignore

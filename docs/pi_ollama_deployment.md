@@ -88,8 +88,8 @@ sudo bash docs/setup_pi_hotspot_portal.sh Sinai-AI-Test OPEN 192.168.50.1
 After phones join the Pi SSID, most devices auto-open a captive portal window that redirects to:
 
 ```text
-Monitor: http://192.168.50.1:8501/monitor
-Phone:   http://192.168.50.1:8501/client
+Monitor: http://192.168.50.1/monitor
+Phone:   http://192.168.50.1/client
 ```
 
 If captive portal auto-open does not trigger, users can browse to that URL directly.

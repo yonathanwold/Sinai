@@ -233,10 +233,10 @@ sudo bash docs/setup_pi_hotspot_portal.sh Sinai-AI-Test OPEN 192.168.50.1
 ```
 
 Then phones join Pi Wi-Fi and open:
-- `http://192.168.50.1:8501/client`
+- `http://192.168.50.1/client`
 
 Use monitor/HDMI:
-- `http://127.0.0.1:8501/monitor`
+- `http://127.0.0.1/monitor` (or `http://127.0.0.1:8501/monitor`)
 
 `OPEN` means no password. If you want a password later, pass one as the second argument.
 
