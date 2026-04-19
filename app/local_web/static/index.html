@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sinai | Offline Resilience Assistant</title>
+    <meta
+      name="description"
+      content="Sinai - Offline AI for resilient food systems and environmental decisions."
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-mark">S</div>
+          <div>
+            <div class="brand-name">Sinai</div>
+            <div class="brand-tagline">
+              Offline AI for resilient food systems and environmental decisions.
+            </div>
+          </div>
+        </div>
+        <div class="status-wrap" id="statusWrap">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Checking local AI...</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="chat-column">
+          <div class="mission-row">
+            <div class="mission-copy">
+              <div class="mission-title">Local Decision Support Assistant</div>
+              <p>
+                Use Sinai to interpret environmental context, evaluate resilience risks, and plan
+                practical food-system actions when connectivity is limited.
+              </p>
+            </div>
+            <div class="controls">
+              <label for="modeSelect">Data mode</label>
+              <select id="modeSelect">
+                <option value="mock">Mock context</option>
+                <option value="live">Live sensors + fallback</option>
+              </select>
+              <label for="regionSelect">Region profile</label>
+              <select id="regionSelect"></select>
+            </div>
+          </div>
+
+          <section class="chat-panel">
+            <div class="chat-header">
+              <div>
+                <h1>Sinai Assistant</h1>
+                <p>Chat-first local intelligence for resilience planning</p>
+              </div>
+              <button class="ghost-btn" id="resetBtn" type="button">Reset Session</button>
+            </div>
+
+            <div class="chat-log" id="chatLog" aria-live="polite"></div>
+
+            <div class="typing-row hidden" id="typingRow">
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+              <span>Sinai is analyzing local context...</span>
+            </div>
+
+            <form class="composer" id="chatForm">
+              <textarea
+                id="chatInput"
+                rows="1"
+                maxlength="2000"
+                placeholder="Ask Sinai about crops, risk, or next steps."
+              ></textarea>
+              <button class="send-btn" id="sendBtn" type="submit">Send</button>
+            </form>
+
+            <div class="quick-actions">
+              <button class="quick-btn" data-prompt="Analyze current conditions and summarize what matters most right now.">
+                Analyze Conditions
+              </button>
+              <button class="quick-btn" data-prompt="Recommend the best crops for this context and explain the tradeoffs.">
+                Recommend Crops
+              </button>
+              <button class="quick-btn" data-prompt="Explain key environmental risks and how we should prepare before a disruption.">
+                Explain Risks
+              </button>
+              <button class="quick-btn" data-prompt="Suggest resilient next steps for community food access over the next 7 days.">
+                Suggest Next Steps
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <aside class="context-column">
+          <section class="context-card">
+            <h2>Environmental Context</h2>
+            <div id="contextSummary" class="context-summary">Loading context...</div>
+            <dl class="metric-grid">
+              <div>
+                <dt>Temperature</dt>
+                <dd id="metricTemperature">--</dd>
+              </div>
+              <div>
+                <dt>Light</dt>
+                <dd id="metricLight">--</dd>
+              </div>
+              <div>
+                <dt>UV</dt>
+                <dd id="metricUv">--</dd>
+              </div>
+              <div>
+                <dt>Pressure Trend</dt>
+                <dd id="metricPressure">--</dd>
+              </div>
+              <div>
+                <dt>Air Quality</dt>
+                <dd id="metricAir">--</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd id="metricSource">--</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="context-card">
+            <h2>Top Resilience Crops</h2>
+            <ul id="cropList" class="crop-list"></ul>
+          </section>
+
+          <section class="context-card">
+            <h2>Risk Watch</h2>
+            <ul id="riskList" class="risk-list"></ul>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

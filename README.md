@@ -1,31 +1,52 @@
 # Sinai
 
-Sinai is a disaster-resilient, offline-capable food intelligence MVP for NGOs, governments, co-ops, and response agencies.
+**Sinai — Offline AI for resilient food systems and environmental decisions.**
 
-It combines edge sensors, deterministic crop scoring, and a local AI advisor so field teams can make food-production decisions even when internet and supply chains fail.
+Sinai is a local-network AI assistant for low-resource and disaster-prone environments.  
+It runs on a Raspberry Pi or local machine, uses local sensor/mock context, and answers mission-oriented questions through a chat-first web interface powered by Ollama.
 
-## What Sinai Does
+## Why This MVP Matters
 
-- Ingests sensor data from Raspberry Pi I2C sensors plus Arduino serial light readings.
-- Auto-falls back to realistic mock data if live hardware is missing.
-- Classifies environment with explainable labels (temperature, light, UV, air quality, pressure trend).
-- Scores and ranks crops with resilience and harvest-speed priorities.
-- Serves a polished local dashboard that can be opened from nearby phones/laptops.
-- Supports local LLM guidance through Ollama, with deterministic fallback always available.
+Sinai demonstrates a product-level concept, not a sensor script:
 
-## Product Framing
+- local AI assistant as the primary workflow
+- context-aware guidance with environmental signals
+- resilient operation when internet access is unreliable
+- accessible to multiple nearby users from phones/laptops over local Wi-Fi
 
-Sinai is designed as an edge SaaS deployment model:
+Crop recommendation is included, but as one capability among broader resilience decision support.
 
-- `Edge node`: Raspberry Pi runs sensing, scoring, LLM interface, and web dashboard.
-- `Users`: nearby field operators connect via local network/hotspot on any browser.
-- `Business model`: recurring analytics and recommendation software per deployment site.
+## Main Features
 
-## Folder Structure
+- Chat-first UI (primary screen)
+- Local Ollama integration (`/api/chat`)
+- Context injection (temperature, pressure, UV, light, air quality, summary, top crops, risk flags)
+- Mock or live sensor mode
+- Session-based history (in-memory + browser session storage)
+- Quick action prompts for:
+  - Analyze conditions
+  - Recommend crops
+  - Explain risks
+  - Suggest resilient next steps
+- Local AI status indicator (`Local AI Running` or fallback mode)
+
+## Project Structure
 
 ```text
 Sinai/
   app/
+    local_web/
+      server.py
+      static/
+        index.html
+        styles.css
+        app.js
+      services/
+        context_provider.py
+        fallback_assistant.py
+        ollama_client.py
+        prompting.py
+        session_store.py
     dashboard/
       streamlit_app.py
     data/
@@ -46,142 +67,106 @@ Sinai/
     grove_light_serial.ino
   docs/
     hardware_architecture.md
-    pi_ollama_deployment.md
     install_ollama_mini_pi.sh
-  README.md
+    pi_ollama_deployment.md
   requirements.txt
   requirements-hardware.txt
 ```
 
-## Hardware Architecture
+## Backend Architecture (Local Web)
 
-```text
-Arduino (Grove Light Sensor A0)
-  -> serial JSON -> Raspberry Pi
+- **FastAPI server**: `app/local_web/server.py`
+- **Chat endpoint**: `POST /api/chat`
+- **Context endpoint**: `GET /api/context`
+- **Health endpoint**: `GET /api/health`
+- **Session history**: `GET /api/history`, `POST /api/reset`
 
-Raspberry Pi (I2C sensors)
-  - SPA06-003 (pressure/temperature)
-  - VEML6070 (UV)
-  - CCS811 (air quality)
-  - Arduino serial light
+Flow:
 
-Pi runtime
-  - sensor ingestion + fallback
-  - environment classification
-  - crop scoring and ranking
-  - local AI explanations (optional)
-  - Streamlit web dashboard
-```
+1. Collect environment context (mock/live).
+2. Build system + context-grounded prompt.
+3. Send to Ollama.
+4. Return action-oriented response for resilience planning.
+5. If Ollama is unavailable, use deterministic fallback guidance.
 
-## Software Architecture
+## Local Setup
 
-- `app/services/sensor_ingestion.py`: live reads + mock fallback merge.
-- `app/services/normalization.py`: explainable threshold classification.
-- `app/services/crop_engine.py`: ranking logic + emergency candidates.
-- `app/services/ai_recommender.py`: narrative recommendation output.
-- `app/services/local_ai_advisor.py`: local LLM Q&A adapter + fallback.
-- `app/dashboard/streamlit_app.py`: B2B-ready UI with `Sinai Dashboard`, `Local LLM Advisor`, and `Edge Deployment` tabs.
+### 1) Install dependencies
 
-## Quick Start (Local Demo)
-
-### Windows PowerShell
-
-```powershell
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate  # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-streamlit run app/dashboard/streamlit_app.py
 ```
 
-### Linux / macOS / Raspberry Pi
+### 2) Configure Ollama (optional but recommended)
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run app/dashboard/streamlit_app.py
+export OLLAMA_HOST=http://127.0.0.1:11434
+export OLLAMA_MODEL=llama3.2:1b
 ```
 
-Open `http://localhost:8501`.
+Sinai also accepts:
 
-## Mock Mode and Live Mode
+- `SINAI_OLLAMA_HOST`
+- `SINAI_OLLAMA_MODEL`
 
-- Dashboard defaults to mock-friendly behavior and never hard-crashes on sensor failures.
-- In the sidebar, choose:
-  - `Demo/mock mode`
-  - `Live sensor mode` (with automatic backfill for missing signals)
-
-You can force mock mode by env var:
+### 3) Run the local web app (chat-first demo)
 
 ```bash
-export SINAI_FORCE_MOCK=true
+uvicorn app.local_web.server:app --host 0.0.0.0 --port 8501 --reload
 ```
 
-Legacy compatibility is kept for `AGRISENSE_FORCE_MOCK`.
+Open:
 
-## Raspberry Pi + Ollama Mini (Recommended for Demo)
+- Local machine: `http://localhost:8501`
+- Same Wi-Fi device: `http://<your-ip>:8501`
 
-Fast path:
-
-```bash
-bash docs/install_ollama_mini_pi.sh llama3.2:1b /home/pi/Sinai
-```
-
-Detailed instructions:
-
-- `docs/pi_ollama_deployment.md`
-
-Important environment variables:
-
-- `OLLAMA_HOST` or `SINAI_OLLAMA_HOST` (example: `http://127.0.0.1:11434`)
-- `OLLAMA_MODEL` or `SINAI_OLLAMA_MODEL` (default: `llama3.2:1b`)
-
-## Multi-User Offline Access
-
-Run Streamlit on all interfaces:
+### 4) (Optional) Streamlit dashboard
 
 ```bash
 streamlit run app/dashboard/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
 ```
 
-Nearby users on the same network open:
+## Network Demo (Phone/Laptop)
 
-```text
-http://<pi-ip>:8501
-```
+1. Ensure host machine and demo devices are on the same network.
+2. Run Sinai with `--host 0.0.0.0`.
+3. Find your machine IP:
+   - macOS/Linux: `hostname -I` or `ip a`
+   - Windows: `ipconfig`
+4. Open `http://<ip>:8501` from phone browser.
 
-For strongest offline story, use Pi hotspot mode and let all demo devices join that SSID.
+## Sensor and Context Notes
 
-## Arduino Sketch
+- In **mock mode**, Sinai generates realistic region-based environmental context.
+- In **live mode**, Sinai attempts hardware reads and auto-backfills missing values with mock data.
+- Legacy force-mock env var remains supported:
+  - `SINAI_FORCE_MOCK=true`
+  - compatibility alias: `AGRISENSE_FORCE_MOCK=true`
 
-Upload:
+## System Prompt Behavior
 
-- `arduino/grove_light_serial.ino`
+Sinai is configured to:
 
-This sends light readings over serial for Pi ingestion.
+- stay grounded in provided context
+- avoid hallucinating missing values
+- explain uncertainty honestly
+- provide practical actions for low-resource decision-making
+- prioritize resilience, preparedness, and food access
 
-## Hackathon Demo Flow (3-4 minutes)
+## Fast Hackathon Demo Script (3 Minutes)
 
-1. Open with disruption problem: no cloud, no stable supply chains, but food decisions still needed.
-2. Show Sinai dashboard live with current field profile and top crop strategy.
-3. Open `Local LLM Advisor` tab and ask an operational question.
-4. Open `Edge Deployment` tab to show local-network URLs and Pi deployment readiness.
-5. Close with B2B model: deploy per site for NGOs/agencies with recurring analytics + AI guidance.
+1. Open Sinai chat UI and show `Local AI Running`.
+2. Ask: “What should we prioritize this week for safe food production?”
+3. Ask: “What risks should we watch if weather becomes unstable?”
+4. Ask: “Why is crop X not ideal right now?”
+5. Highlight that everything runs locally and is accessible from nearby phones without cloud dependency.
 
-## Where To Customize Quickly
+## Where to Customize Quickly
 
-- Crop library and metadata: `app/data/crops.json`
-- Scoring weights and ranking: `app/services/crop_engine.py`
-- Classification thresholds: `app/services/normalization.py`
-- Local LLM behavior/fallback: `app/services/local_ai_advisor.py`
-- UI copy, layout, visuals: `app/dashboard/streamlit_app.py`
-- Pi deployment setup: `docs/pi_ollama_deployment.md`
+- LLM behavior/system rules: `app/local_web/services/prompting.py`
+- Context construction and top crops: `app/local_web/services/context_provider.py`
+- Ollama behavior/model selection: `app/local_web/services/ollama_client.py`
+- Chat UI and interaction: `app/local_web/static/index.html`, `app/local_web/static/styles.css`, `app/local_web/static/app.js`
 
-## Notes
-
-Sinai is intentionally reliability-first for live judging:
-
-- sensor read failures degrade gracefully
-- mock data preserves demo continuity
-- recommendation engine remains deterministic
-- local AI layer improves explainability without becoming a single point of failure
