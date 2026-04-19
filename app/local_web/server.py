@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict, deque
 import contextlib
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import os
@@ -483,6 +484,70 @@ class DataIngestRequest(BaseModel):
     air_quality_tvoc_ppb: float | None = None
 
 
+@dataclass
+class PromptQueueJob:
+    session_id: str
+    question: str
+    payload: "ChatRequest"
+    enqueued_at_utc: str
+    future: asyncio.Future[dict[str, object]]
+
+
+class PromptQueueProcessor:
+    """Single-worker FIFO queue for prompt processing across all devices."""
+
+    def __init__(self) -> None:
+        self._queue: asyncio.Queue[PromptQueueJob] = asyncio.Queue()
+        self._worker_task: asyncio.Task | None = None
+        self._processing = False
+
+    def snapshot(self) -> dict[str, object]:
+        queued = self._queue.qsize()
+        processing = self._processing
+        return {
+            "queued": queued,
+            "processing": processing,
+            "pending_total": queued + (1 if processing else 0),
+        }
+
+    async def start(self) -> None:
+        if self._worker_task and not self._worker_task.done():
+            return
+        self._worker_task = asyncio.create_task(self._run(), name="sinai-prompt-queue")
+
+    async def stop(self) -> None:
+        if not self._worker_task:
+            return
+        self._worker_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await self._worker_task
+        self._worker_task = None
+        self._processing = False
+
+    async def enqueue(self, job: PromptQueueJob) -> None:
+        await self._queue.put(job)
+
+    async def _run(self) -> None:
+        while True:
+            job = await self._queue.get()
+            self._processing = True
+            try:
+                await _broadcast_queue_status()
+                result = await _process_chat_job(job)
+                if not job.future.done():
+                    job.future.set_result(result)
+            except Exception as exc:
+                if not job.future.done():
+                    job.future.set_exception(exc)
+            finally:
+                self._processing = False
+                self._queue.task_done()
+                await _broadcast_queue_status()
+
+
+prompt_queue = PromptQueueProcessor()
+
+
 def _extract_ingest_readings(payload: DataIngestRequest) -> dict[str, float | None]:
     merged: dict[str, Any] = dict(payload.readings)
 
@@ -520,6 +585,15 @@ async def _broadcast_device_snapshot() -> None:
     )
 
 
+async def _broadcast_queue_status() -> None:
+    snapshot = {
+        "type": "queue_status",
+        **prompt_queue.snapshot(),
+    }
+    await realtime_hub.broadcast_monitors(snapshot)
+    await realtime_hub.broadcast_clients(snapshot)
+
+
 async def _broadcast_sensor_snapshot() -> None:
     await realtime_hub.broadcast_monitors(
         {
@@ -545,14 +619,59 @@ async def _sensor_poll_loop() -> None:
         await asyncio.sleep(DATA_POLL_INTERVAL)
 
 
+async def _process_chat_job(job: PromptQueueJob) -> dict[str, object]:
+    history_before = session_store.history(job.session_id)
+    context = await asyncio.to_thread(
+        context_provider.get_context,
+        job.payload.mode,
+        job.payload.site_name,
+        job.payload.region,
+    )
+    messages = build_messages(
+        user_message=job.question,
+        context=context,
+        history=history_before,
+    )
+
+    user_event = session_store.add_turn(job.session_id, role="user", content=job.question)
+    await realtime_hub.broadcast_monitors({"type": "chat_event", "item": user_event})
+
+    source = "ollama"
+    model_name = None
+    try:
+        answer, model_name = await asyncio.to_thread(ollama_client.chat, messages)
+    except Exception:
+        source = "fallback"
+        answer = fallback_response(job.question, context)
+
+    assistant_event = session_store.add_turn(job.session_id, role="assistant", content=answer)
+
+    await realtime_hub.broadcast_monitors({"type": "chat_event", "item": assistant_event})
+    await realtime_hub.broadcast_clients(
+        {"type": "chat_event", "item": assistant_event},
+        session_id=job.session_id,
+    )
+    await _broadcast_device_snapshot()
+
+    return {
+        "reply": answer,
+        "source": source,
+        "model": model_name,
+        "context": context,
+        "history": session_store.history(job.session_id),
+    }
+
+
 @app.on_event("startup")
 async def on_startup() -> None:
     await sensor_feed.refresh()
+    await prompt_queue.start()
     app.state.sensor_poll_task = asyncio.create_task(_sensor_poll_loop())
 
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
+    await prompt_queue.stop()
     poll_task = getattr(app.state, "sensor_poll_task", None)
     if poll_task:
         poll_task.cancel()
@@ -663,6 +782,11 @@ async def get_data_live() -> dict[str, object]:
     return await sensor_feed.payload()
 
 
+@app.get("/api/queue/status")
+def get_queue_status() -> dict[str, object]:
+    return prompt_queue.snapshot()
+
+
 @app.post("/api/data/ingest")
 async def ingest_data(payload: DataIngestRequest) -> dict[str, object]:
     readings = _extract_ingest_readings(payload)
@@ -699,46 +823,33 @@ async def chat(request: Request, payload: ChatRequest) -> dict[str, object]:
     if not question:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
-    user_event = session_store.add_turn(session_id, role="user", content=question)
-    await realtime_hub.broadcast_monitors({"type": "chat_event", "item": user_event})
-
-    context = await asyncio.to_thread(
-        context_provider.get_context,
-        payload.mode,
-        payload.site_name,
-        payload.region,
-    )
-    history = session_store.history(session_id)
-    messages = build_messages(
-        user_message=question,
-        context=context,
-        history=history,
-    )
-
-    source = "ollama"
-    model_name = None
-    try:
-        answer, model_name = await asyncio.to_thread(ollama_client.chat, messages)
-    except Exception:
-        source = "fallback"
-        answer = fallback_response(question, context)
-
-    assistant_event = session_store.add_turn(session_id, role="assistant", content=answer)
-
-    await realtime_hub.broadcast_monitors({"type": "chat_event", "item": assistant_event})
-    await realtime_hub.broadcast_clients(
-        {"type": "chat_event", "item": assistant_event},
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[dict[str, object]] = loop.create_future()
+    queued_snapshot = prompt_queue.snapshot()
+    job = PromptQueueJob(
         session_id=session_id,
+        question=question,
+        payload=payload,
+        enqueued_at_utc=datetime.now(timezone.utc).isoformat(),
+        future=future,
     )
-    await _broadcast_device_snapshot()
+    await prompt_queue.enqueue(job)
+    await _broadcast_queue_status()
 
-    return {
-        "reply": answer,
-        "source": source,
-        "model": model_name,
-        "context": context,
-        "history": session_store.history(session_id),
+    try:
+        result = await future
+    except asyncio.CancelledError:
+        if not future.done():
+            future.cancel()
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Queue processing failed: {exc}") from exc
+
+    result["queue"] = {
+        "queued_ahead_on_submit": queued_snapshot["pending_total"],
+        **prompt_queue.snapshot(),
     }
+    return result
 
 
 @app.websocket("/ws/realtime")
@@ -762,6 +873,7 @@ async def websocket_realtime(websocket: WebSocket) -> None:
                 "role": "client",
                 "session_id": session_id,
                 "device": session_store.device_profile(session_id),
+                "queue": prompt_queue.snapshot(),
             }
         )
     else:
@@ -772,6 +884,7 @@ async def websocket_realtime(websocket: WebSocket) -> None:
                 "devices": session_store.devices_snapshot(),
                 "feed": session_store.live_feed(limit=40),
                 "data": await sensor_feed.payload(),
+                "queue": prompt_queue.snapshot(),
             }
         )
 

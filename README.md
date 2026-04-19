@@ -7,6 +7,7 @@ It is designed for hackathon judging:
 - many phone clients with clear device identity
 - a dedicated Data Mode fed by live Arduino/sensor readings
 - realtime sync across monitor, phones, and sensor updates
+- global FIFO prompt queue so responses follow ask order across devices
 - local execution on laptop or Raspberry Pi (no cloud dependency required)
 
 ## Final Demo Surfaces

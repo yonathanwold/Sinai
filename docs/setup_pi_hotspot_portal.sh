@@ -139,6 +139,11 @@ EOF
 
   log "Bringing up hotspot services..."
   rfkill unblock wlan || true
+  if command -v nmcli >/dev/null 2>&1; then
+    nmcli dev disconnect "${WLAN_IFACE}" >/dev/null 2>&1 || true
+  fi
+  systemctl stop NetworkManager || true
+  systemctl stop wpa_supplicant || true
   systemctl unmask hostapd || true
   if systemctl list-unit-files | grep -q '^dhcpcd\.service'; then
     systemctl restart dhcpcd
@@ -157,6 +162,8 @@ configure_with_nmcli() {
   apt-get update
   apt-get install -y network-manager nginx
 
+  systemctl disable --now hostapd dnsmasq >/dev/null 2>&1 || true
+  systemctl stop wpa_supplicant >/dev/null 2>&1 || true
   systemctl enable --now NetworkManager
   rfkill unblock wlan || true
 
