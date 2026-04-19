@@ -14,11 +14,7 @@ def fallback_response(user_message: str, context: dict[str, object]) -> str:
     question = user_message.lower()
     crop_name = top_crops[0]["name"] if top_crops else "the top-ranked resilient crop"
 
-    lines: list[str] = [
-        "Sinai fallback mode is active (local model unavailable), so this response is deterministic.",
-        "",
-        f"Current context: {summary}",
-    ]
+    lines: list[str] = [f"Current context: {summary}"]
 
     if "crop" in question or "plant" in question:
         lines.append(
@@ -57,6 +53,5 @@ def fallback_response(user_message: str, context: dict[str, object]) -> str:
             f"pressure_trend={labels.get('pressure_trend')}."
         )
 
-    lines.append("If Ollama comes online, Sinai will switch back to full local LLM guidance automatically.")
+    lines.append("Local quick-response mode is active while the full on-device AI model starts.")
     return "\n".join(lines)
-
