@@ -88,7 +88,7 @@ export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-/home/pi/.Xauthority}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/1000}"
 
-URL="${SINAI_MONITOR_URL:-http://127.0.0.1:8501/monitor}"
+URL="${SINAI_MONITOR_URL:-http://127.0.0.1/monitor}"
 PROFILE_DIR="/home/pi/.config/sinai-kiosk-chromium"
 mkdir -p "${PROFILE_DIR}"
 exec 9>/tmp/sinai-kiosk-launch.lock
@@ -101,7 +101,7 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 
-pkill -f 'chrom.*127.0.0.1:8501/monitor' >/dev/null 2>&1 || true
+pkill -f 'chrom.*127.0.0.1.*monitor' >/dev/null 2>&1 || true
 
 for browser in chromium-browser chromium google-chrome; do
   if command -v "${browser}" >/dev/null 2>&1; then
@@ -152,7 +152,10 @@ Environment=SINAI_OLLAMA_TIMEOUT=60
 Environment=SINAI_OLLAMA_MAX_TOKENS=80
 Environment=SINAI_OLLAMA_CONTEXT_WINDOW=1536
 Environment=SINAI_OLLAMA_KEEP_ALIVE=20m
-ExecStart=${TARGET_DIR}/.venv/bin/uvicorn app.local_web.server:app --host 0.0.0.0 --port 8501
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ExecStart=${TARGET_DIR}/.venv/bin/uvicorn app.local_web.server:app --host 0.0.0.0 --port 80
 Restart=always
 RestartSec=3
 User=pi
@@ -204,7 +207,8 @@ stop_existing_network_managers() {
 apply_port_redirect() {
   if command -v iptables >/dev/null 2>&1; then
     iptables -t nat -D PREROUTING -i "\${IFACE}" -p tcp --dport 80 -j REDIRECT --to-ports 8501 2>/dev/null || true
-    iptables -t nat -A PREROUTING -i "\${IFACE}" -p tcp --dport 80 -j REDIRECT --to-ports 8501 || true
+    iptables -t nat -D PREROUTING -i "\${IFACE}" -p tcp --dport 8501 -j REDIRECT --to-ports 80 2>/dev/null || true
+    iptables -t nat -A PREROUTING -i "\${IFACE}" -p tcp --dport 8501 -j REDIRECT --to-ports 80 || true
   fi
 }
 
