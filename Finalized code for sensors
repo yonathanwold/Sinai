@@ -1,0 +1,143 @@
+#include <Wire.h>
+#include "Seeed_SPA06.h"
+#include "SparkFunCCS811.h"
+
+#define CCS811_ADDR 0x5B
+
+SPA06 spa06;                    // Barometer
+CCS811 myCCS811(CCS811_ADDR);
+
+const int LIGHT_PIN = A1;
+const int TEMP_PIN  = A2;
+
+void setup() {
+  Serial.begin(9600);
+  delay(3000);
+ 
+  Wire.begin();
+
+  // Initialize SPA06 Barometer
+  if (spa06.begin() != 0) {
+    Serial.println("SPA06 barometer not found! Check wiring.");
+    while(1);
+  }
+  Serial.println("SPA06 Barometer ready!");
+
+  // Initialize CCS811
+  myCCS811.begin();
+  Serial.println("CCS811 started!");
+
+  Serial.println("All sensors ready!");
+  Serial.println("========================");
+}
+
+void loop() {
+  // Light Sensor
+  int light = analogRead(LIGHT_PIN);
+  Serial.print("Light: ");
+  Serial.println(light);
+
+  // TMP36 Temperature Sensor
+  int tempRaw = analogRead(TEMP_PIN);
+  float voltage = tempRaw * (5.0 / 1023.0);
+  float temperature = ((voltage - 0.5) * 100.0) / 5.53;
+  Serial.print("Temperature (TMP36): ");
+  Serial.print(temperature, 2);
+  Serial.println(" C");
+
+  // SPA06 Barometer - Pressure only
+  float pressurePa = spa06.getPressure();
+  float pressurehPa = pressurePa / 100.0;
+ 
+  Serial.print("Pressure: ");
+  Serial.print(pressurehPa, 2);
+  Serial.println(" hPa");
+
+  // CCS811 Air Quality
+  if (myCCS811.dataAvailable()) {
+    myCCS811.readAlgorithmResults();
+    Serial.print("CO2: ");
+    Serial.print(myCCS811.getCO2());
+    Serial.println(" ppm");
+   
+    Serial.print("VOC: ");
+    Serial.print(myCCS811.getTVOC());
+    Serial.println(" ppb");
+  } else {
+    Serial.println("CCS811 warming up...");
+  }
+
+  Serial.println("----------");
+  delay(1000);
+}#include <Wire.h>
+#include "Seeed_SPA06.h"
+#include "SparkFunCCS811.h"
+
+#define CCS811_ADDR 0x5B
+
+SPA06 spa06;                    // Barometer
+CCS811 myCCS811(CCS811_ADDR);
+
+const int LIGHT_PIN = A1;
+const int TEMP_PIN  = A2;
+
+void setup() {
+  Serial.begin(9600);
+  delay(3000);
+ 
+  Wire.begin();
+
+  // Initialize SPA06 Barometer
+  if (spa06.begin() != 0) {
+    Serial.println("SPA06 barometer not found! Check wiring.");
+    while(1);
+  }
+  Serial.println("SPA06 Barometer ready!");
+
+  // Initialize CCS811
+  myCCS811.begin();
+  Serial.println("CCS811 started!");
+
+  Serial.println("All sensors ready!");
+  Serial.println("========================");
+}
+
+void loop() {
+  // Light Sensor
+  int light = analogRead(LIGHT_PIN);
+  Serial.print("Light: ");
+  Serial.println(light);
+
+  // TMP36 Temperature Sensor
+  int tempRaw = analogRead(TEMP_PIN);
+  float voltage = tempRaw * (5.0 / 1023.0);
+  float temperature = ((voltage - 0.5) * 100.0) / 5.53;
+  Serial.print("Temperature (TMP36): ");
+  Serial.print(temperature, 2);
+  Serial.println(" C");
+
+  // SPA06 Barometer - Pressure only
+  float pressurePa = spa06.getPressure();
+  float pressurehPa = pressurePa / 100.0;
+ 
+  Serial.print("Pressure: ");
+  Serial.print(pressurehPa, 2);
+  Serial.println(" hPa");
+
+  // CCS811 Air Quality
+  if (myCCS811.dataAvailable()) {
+    myCCS811.readAlgorithmResults();
+    Serial.print("CO2: ");
+    Serial.print(myCCS811.getCO2());
+    Serial.println(" ppm");
+   
+    Serial.print("VOC: ");
+    Serial.print(myCCS811.getTVOC());
+    Serial.println(" ppb");
+  } else {
+    Serial.println("CCS811 warming up...");
+  }
+
+  Serial.println("----------");
+  delay(1000);
+} 
