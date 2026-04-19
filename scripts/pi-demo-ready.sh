@@ -10,11 +10,11 @@ LOG_FILE="${BOOT_DIR}/sinai-demo-ready.log"
 PROGRESS_FILE="${BOOT_DIR}/sinai-ollama-progress.json"
 TARGET_DIR="/home/pi/Sinai"
 MODEL_NAME="${SINAI_OLLAMA_MODEL:-llama3.2:1b}"
-HOTSPOT_SSID="${SINAI_HOTSPOT_SSID:-Sinai-AI-Test}"
+HOTSPOT_SSID="${SINAI_HOTSPOT_SSID:-Sinai-AI-Demo}"
 HOTSPOT_PASSWORD="${SINAI_HOTSPOT_PASSWORD:-12345678}"
 HOTSPOT_IP="${SINAI_HOTSPOT_IP:-192.168.50.1}"
 HOTSPOT_IFACE="${SINAI_HOTSPOT_IFACE:-wlan0}"
-HOTSPOT_CHANNEL="${SINAI_HOTSPOT_CHANNEL:-6}"
+HOTSPOT_CHANNEL="${SINAI_HOTSPOT_CHANNEL:-1}"
 
 exec > >(tee -a "${LOG_FILE}") 2>&1
 
@@ -168,7 +168,7 @@ EOF
 }
 
 configure_hotspot() {
-  log "Configuring reliable WPA2 hotspot using hostapd and dnsmasq."
+  log "Configuring self-contained WPA2 hotspot using hostapd and dnsmasq."
 
   cat >/usr/local/sbin/sinai-hotspot-start.sh <<EOF
 #!/usr/bin/env bash
@@ -186,9 +186,18 @@ PASSWORD="\${SINAI_HOTSPOT_PASSWORD:-${HOTSPOT_PASSWORD}}"
 AP_IP="\${SINAI_HOTSPOT_IP:-${HOTSPOT_IP}}"
 IFACE="\${SINAI_HOTSPOT_IFACE:-${HOTSPOT_IFACE}}"
 CHANNEL="\${SINAI_HOTSPOT_CHANNEL:-${HOTSPOT_CHANNEL}}"
+AP_NET="\${AP_IP%.*}.0/24"
+AP_PREFIX="\${AP_IP%.*}"
 
 log() {
   echo "[Sinai Hotspot] \$(date -Is) \$*"
+}
+
+stop_existing_network_managers() {
+  systemctl stop NetworkManager wpa_supplicant dhcpcd hostapd dnsmasq >/dev/null 2>&1 || true
+  pkill -x hostapd >/dev/null 2>&1 || true
+  pkill -x dnsmasq >/dev/null 2>&1 || true
+  rm -f /run/sinai-hostapd.pid /run/sinai-dnsmasq.pid
 }
 
 apply_port_redirect() {
@@ -214,25 +223,28 @@ log "Starting WPA2 hotspot."
 rfkill unblock all >/dev/null 2>&1 || true
 wait_for_wifi || exit 1
 
-systemctl stop NetworkManager wpa_supplicant >/dev/null 2>&1 || true
-systemctl stop hostapd dnsmasq >/dev/null 2>&1 || true
+stop_existing_network_managers
 
 ip link set "\${IFACE}" down >/dev/null 2>&1 || true
 ip addr flush dev "\${IFACE}" >/dev/null 2>&1 || true
 ip addr add "\${AP_IP}/24" dev "\${IFACE}" >/dev/null 2>&1 || true
 ip link set "\${IFACE}" up >/dev/null 2>&1 || true
+ip route replace "\${AP_NET}" dev "\${IFACE}" proto kernel scope link src "\${AP_IP}" >/dev/null 2>&1 || true
 
 cat >/etc/hostapd/hostapd.conf <<HEOF
 country_code=US
 interface=\${IFACE}
+driver=nl80211
 ssid=\${SSID}
 hw_mode=g
 channel=\${CHANNEL}
-wmm_enabled=1
-ieee80211n=1
+wmm_enabled=0
+ieee80211n=0
+ieee80211d=1
 macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
+ap_isolate=0
 HEOF
 
 if [ -n "\${PASSWORD}" ]; then
@@ -240,33 +252,52 @@ if [ -n "\${PASSWORD}" ]; then
 wpa=2
 wpa_passphrase=\${PASSWORD}
 wpa_key_mgmt=WPA-PSK
+wpa_pairwise=CCMP
 rsn_pairwise=CCMP
+ieee80211w=0
 HEOF
 fi
 
-mkdir -p /etc/dnsmasq.d
-cat >/etc/dnsmasq.d/sinai-hotspot.conf <<DEOF
+mkdir -p /etc/sinai /var/lib/misc
+cat >/etc/sinai/dnsmasq-hotspot.conf <<DEOF
 interface=\${IFACE}
 bind-interfaces
-dhcp-range=192.168.50.20,192.168.50.250,255.255.255.0,24h
+listen-address=\${AP_IP}
+port=53
+dhcp-range=\${AP_PREFIX}.20,\${AP_PREFIX}.250,255.255.255.0,12h
 dhcp-authoritative
 dhcp-option=option:router,\${AP_IP}
 dhcp-option=option:dns-server,\${AP_IP}
+dhcp-option=114,http://\${AP_IP}/client
+dhcp-option=252,http://\${AP_IP}/client
 address=/#/\${AP_IP}
 no-resolv
 cache-size=1000
+log-dhcp
+log-facility=\${BOOT_DIR}/sinai-dhcp.log
 DEOF
 
 grep -q 'sinai.local' /etc/hosts 2>/dev/null || echo "\${AP_IP} sinai.local sinai.test" >> /etc/hosts
 sed -i 's|^#*DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd || true
 
-systemctl unmask hostapd >/dev/null 2>&1 || true
-systemctl enable hostapd dnsmasq >/dev/null 2>&1 || true
-systemctl restart hostapd dnsmasq
-sleep 2
+if ! /usr/sbin/hostapd -B -P /run/sinai-hostapd.pid /etc/hostapd/hostapd.conf; then
+  log "hostapd failed to start."
+  cat /etc/hostapd/hostapd.conf || true
+  exit 1
+fi
+
+if ! /usr/sbin/dnsmasq --conf-file=/etc/sinai/dnsmasq-hotspot.conf --pid-file=/run/sinai-dnsmasq.pid --dhcp-leasefile=/var/lib/misc/sinai-dnsmasq.leases; then
+  log "dnsmasq failed to start."
+  cat /etc/sinai/dnsmasq-hotspot.conf || true
+  exit 1
+fi
+
+sleep 3
 apply_port_redirect
-systemctl is-active --quiet hostapd && systemctl is-active --quiet dnsmasq
+pgrep -F /run/sinai-hostapd.pid >/dev/null
+pgrep -F /run/sinai-dnsmasq.pid >/dev/null
 ip addr show "\${IFACE}" || true
+iw dev "\${IFACE}" info || true
 log "Ready. SSID=\${SSID} PASSWORD=\${PASSWORD:-none} URL=http://\${AP_IP}/client"
 EOF
 
