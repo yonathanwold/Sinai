@@ -474,6 +474,53 @@ body {
   color: var(--text);
 }
 
+.live-feed-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  max-height: 270px;
+  overflow-y: auto;
+}
+
+.feed-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111610;
+  padding: 8px 9px;
+}
+
+.feed-item.user {
+  border-color: #465944;
+  background: #17221a;
+}
+
+.feed-item.assistant {
+  border-color: #2f392f;
+  background: #101510;
+}
+
+.feed-item.empty {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.feed-meta {
+  font-size: 0.72rem;
+  color: var(--text-subtle);
+  margin-bottom: 4px;
+  text-transform: lowercase;
+}
+
+.feed-content {
+  font-size: 0.84rem;
+  color: var(--text);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @keyframes pulse {
   0%,
   80%,

@@ -23,6 +23,7 @@ Crop recommendation is included, but as one capability among broader resilience 
 - Context injection (temperature, pressure, UV, light, air quality, summary, top crops, risk flags)
 - Mock or live sensor mode
 - Session-based history (in-memory + browser session storage)
+- Shared live prompt feed across all connected sessions
 - Quick action prompts for:
   - Analyze conditions
   - Recommend crops
@@ -69,6 +70,7 @@ Sinai/
     hardware_architecture.md
     install_ollama_mini_pi.sh
     install_sinai_web_pi.sh
+    setup_pi_hotspot_portal.sh
     pi_ollama_deployment.md
   requirements.txt
   requirements-hardware.txt
@@ -139,6 +141,20 @@ bash docs/install_sinai_web_pi.sh llama3.2:1b /home/pi/Sinai
 ```
 
 This installs system dependencies, Ollama, the model, Python packages, and configures `sinai-web` as a startup service.
+
+## Raspberry Pi Hotspot + Auto Redirect (Local-Only)
+
+To let phones join Pi Wi-Fi and auto-redirect to Sinai:
+
+```bash
+sudo bash docs/setup_pi_hotspot_portal.sh Sinai-Node SinaiDemo2026 192.168.50.1
+```
+
+After setup, phones can join the Pi SSID and open:
+
+- `http://192.168.50.1:8501`
+
+Most phones will trigger a captive portal pop-up automatically. If not, open that URL manually.
 
 ## Network Demo (Phone/Laptop)
 

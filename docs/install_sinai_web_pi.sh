@@ -12,6 +12,7 @@ SINAI_DIR="${2:-$HOME/Sinai}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-$USER}}"
 REPO_URL="${SINAI_REPO_URL:-https://github.com/yonathanwold/Sinai.git}"
+KIOSK_URL="${SINAI_KIOSK_URL:-http://127.0.0.1:8501}"
 
 log() {
   echo "[Sinai Web] $*"
@@ -88,6 +89,50 @@ rm -f "${SERVICE_TMP}"
 log "Enabling Sinai web service..."
 sudo systemctl daemon-reload
 sudo systemctl enable --now sinai-web
+
+log "Configuring kiosk auto-launch on the Pi monitor..."
+sudo -u "${SERVICE_USER}" mkdir -p "/home/${SERVICE_USER}/.local/bin"
+sudo -u "${SERVICE_USER}" mkdir -p "/home/${SERVICE_USER}/.config/autostart"
+
+cat > "/home/${SERVICE_USER}/.local/bin/sinai-kiosk.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+URL="${KIOSK_URL}"
+sleep 6
+
+for _ in \$(seq 1 120); do
+  if curl -fsS --max-time 2 "\${URL}/api/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+if pgrep -f "chromium.*127.0.0.1:8501" >/dev/null 2>&1; then
+  exit 0
+fi
+
+exec /usr/bin/chromium \
+  --kiosk \
+  --app="\${URL}" \
+  --noerrdialogs \
+  --disable-session-crashed-bubble \
+  --disable-infobars \
+  --check-for-update-interval=31536000
+EOF
+
+cat > "/home/${SERVICE_USER}/.config/autostart/sinai-kiosk.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Sinai Kiosk
+Comment=Open Sinai local web UI on boot
+Exec=/home/${SERVICE_USER}/.local/bin/sinai-kiosk.sh
+Terminal=false
+X-GNOME-Autostart-enabled=true
+EOF
+
+chmod +x "/home/${SERVICE_USER}/.local/bin/sinai-kiosk.sh"
+chown -R "${SERVICE_USER}:${SERVICE_USER}" "/home/${SERVICE_USER}/.local" "/home/${SERVICE_USER}/.config/autostart"
 
 PI_IP="$(hostname -I | awk '{print $1}')"
 

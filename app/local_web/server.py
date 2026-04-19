@@ -122,6 +122,13 @@ def get_history(request: Request) -> dict[str, object]:
     }
 
 
+@app.get("/api/live-feed")
+def get_live_feed(limit: int = 30) -> dict[str, object]:
+    return {
+        "items": session_store.live_feed(limit=limit),
+    }
+
+
 @app.post("/api/reset")
 def reset_history(request: Request) -> dict[str, object]:
     session_id = _get_session_id(request)
@@ -170,4 +177,3 @@ def chat(request: Request, payload: ChatRequest) -> dict[str, object]:
 
 if __name__ == "__main__":
     uvicorn.run("app.local_web.server:app", host="0.0.0.0", port=8501, reload=False)
-

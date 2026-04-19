@@ -67,6 +67,20 @@ For hackathon demos, Pi hotspot mode gives the cleanest story:
 
 This demonstrates true offline operation even when external internet is unavailable.
 
+One-command hotspot + captive redirect setup:
+
+```bash
+sudo bash docs/setup_pi_hotspot_portal.sh Sinai-Node SinaiDemo2026 192.168.50.1
+```
+
+After phones join the Pi SSID, most devices auto-open a captive portal window that redirects to:
+
+```text
+http://192.168.50.1:8501
+```
+
+If captive portal auto-open does not trigger, users can browse to that URL directly.
+
 ## 5. Safety model (recommended)
 
 - Keep crop scoring deterministic in `app/services/crop_engine.py`.

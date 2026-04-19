@@ -18,11 +18,16 @@ const metricAir = document.getElementById("metricAir");
 const metricSource = document.getElementById("metricSource");
 const cropList = document.getElementById("cropList");
 const riskList = document.getElementById("riskList");
+const liveFeedList = document.getElementById("liveFeedList");
+const liveFeedStatus = document.getElementById("liveFeedStatus");
 
 const STORAGE_KEY = "sinai_chat_history_v1";
+const LIVE_FEED_INTERVAL_MS = 2500;
+const LIVE_FEED_LIMIT = 18;
 
 let localMessages = [];
 let currentContext = null;
+let liveFeedTimer = null;
 
 function escapeHtml(text) {
   return text
@@ -192,6 +197,70 @@ function resizeChatInput() {
   chatInput.style.overflowY = chatInput.scrollHeight > 132 ? "auto" : "hidden";
 }
 
+function shortSessionId(sessionId) {
+  if (!sessionId) return "unknown";
+  return sessionId.slice(0, 8);
+}
+
+function formatLocalTime(timestampUtc) {
+  if (!timestampUtc) return "--";
+  const date = new Date(timestampUtc);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function renderLiveFeed(entries) {
+  if (!liveFeedList) return;
+  liveFeedList.innerHTML = "";
+
+  if (!Array.isArray(entries) || entries.length === 0) {
+    const li = document.createElement("li");
+    li.className = "feed-item empty";
+    li.textContent = "No prompts yet. Phones can join and ask now.";
+    liveFeedList.appendChild(li);
+    if (liveFeedStatus) {
+      liveFeedStatus.textContent = "Waiting for network activity...";
+    }
+    return;
+  }
+
+  entries.forEach((entry) => {
+    const item = document.createElement("li");
+    item.className = `feed-item ${entry.role || "unknown"}`;
+
+    const meta = document.createElement("div");
+    meta.className = "feed-meta";
+    const roleLabel = entry.role === "assistant" ? "reply" : "prompt";
+    meta.textContent = `${roleLabel} · ${shortSessionId(entry.session_id)} · ${formatLocalTime(entry.timestamp_utc)}`;
+
+    const content = document.createElement("div");
+    content.className = "feed-content";
+    content.textContent = entry.content || "";
+
+    item.appendChild(meta);
+    item.appendChild(content);
+    liveFeedList.appendChild(item);
+  });
+
+  if (liveFeedStatus) {
+    liveFeedStatus.textContent = `Live across all connected sessions (${entries.length} recent events).`;
+  }
+}
+
+async function fetchLiveFeed() {
+  if (!liveFeedList) return;
+  try {
+    const response = await fetch(`/api/live-feed?limit=${LIVE_FEED_LIMIT}`);
+    if (!response.ok) throw new Error("Live feed request failed.");
+    const payload = await response.json();
+    renderLiveFeed(payload.items || []);
+  } catch {
+    if (liveFeedStatus) {
+      liveFeedStatus.textContent = "Live feed unavailable right now.";
+    }
+  }
+}
+
 function renderContext(context) {
   currentContext = context;
   const labels = context.labels || {};
@@ -357,6 +426,7 @@ async function sendMessage(text) {
     renderMessages(localMessages);
   } finally {
     setBusy(false);
+    await fetchLiveFeed();
     await fetchHealth();
   }
 }
@@ -413,6 +483,13 @@ async function bootstrap() {
   await fetchHealth();
   await fetchContext();
   await syncHistoryFromServer();
+  await fetchLiveFeed();
+  if (liveFeedTimer) {
+    clearInterval(liveFeedTimer);
+  }
+  liveFeedTimer = window.setInterval(() => {
+    fetchLiveFeed();
+  }, LIVE_FEED_INTERVAL_MS);
   resizeChatInput();
   chatInput.focus();
 }
